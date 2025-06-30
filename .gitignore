@@ -17,3 +17,6 @@ dataset/
 #IDLE configuration Pycharm, VSCode, etc.
 .idea/
 .vscode/
+
+# egg-info
+*.egg-info/
