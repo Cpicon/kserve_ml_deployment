@@ -1,6 +1,8 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+.ruff_cache/
+.pytest_cache/
 
 # Virtual environments
 .venv/
@@ -20,3 +22,8 @@ dataset/
 
 # egg-info
 *.egg-info/
+
+# Distribution / packaging
+build/
+dist/
+*.egg
