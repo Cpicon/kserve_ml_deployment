@@ -35,6 +35,10 @@ async def lifespan(app: FastAPI):
     # Ensure storage directory exists
     settings.storage_root.mkdir(parents=True, exist_ok=True)
     
+    # Initialize database
+    from aiq_circular_detection.db import init_db
+    init_db()
+    
     yield
     
     # Shutdown
