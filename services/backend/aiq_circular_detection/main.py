@@ -1,14 +1,15 @@
 import logging
-import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import get_settings
+from aiq_circular_detection.dependencies import get_image_repository
+from aiq_circular_detection.repositories import ImageRepository
 from aiq_circular_detection.schemas import ImageUploadResponse
 from aiq_circular_detection.storage.local import LocalStorageClient
+from config import get_settings
 
 # Get settings and configure logging before anything else
 settings = get_settings()
@@ -19,9 +20,6 @@ logger = logging.getLogger(__name__)
 
 # Initialize storage client
 storage_client = LocalStorageClient()
-
-# In-memory mapping from image_id to file path (placeholder for now)
-image_id_to_path: dict[str, str] = {}
 
 
 @asynccontextmanager
@@ -88,17 +86,24 @@ def get_config() -> dict[str, Any]:
 
 
 @app.post("/images/", response_model=ImageUploadResponse)
-async def upload_image(file: UploadFile) -> ImageUploadResponse:
+async def upload_image(
+    file: UploadFile,
+    image_repository: ImageRepository = Depends(get_image_repository)
+) -> ImageUploadResponse:
     """Upload an image file.
+    
+    The image ID is generated based on the file content using SHA-256 hashing.
+    This ensures that duplicate images are detected and rejected.
     
     Args:
         file: The uploaded image file.
+        image_repository: Repository for storing image metadata.
         
     Returns:
         ImageUploadResponse: Response containing the unique image ID.
         
     Raises:
-        HTTPException: If the file is empty or cannot be saved.
+        HTTPException: If the file is empty, already exists, or cannot be saved.
     """
     # Read the file content
     content = await file.read()
@@ -108,19 +113,28 @@ async def upload_image(file: UploadFile) -> ImageUploadResponse:
         raise HTTPException(status_code=400, detail="File cannot be empty")
     
     try:
+        logger.info(f"Saving image: {file.filename}, content length: {len(content)}")
+        
         # Save the image using storage client
         file_path = storage_client.save_image(content)
         
-        # Generate unique image ID
-        image_id = uuid.uuid4()
-        
-        # Store mapping in memory (placeholder for now)
-        image_id_to_path[str(image_id)] = file_path
+        # Add to repository (this generates the ID based on content)
+        image_id = image_repository.add_image(content, file_path)
         
         logger.info(f"Uploaded image: {image_id} -> {file_path}")
         
-        # Return response with image ID
+        # Return response with image ID (SHA-256 hash)
         return ImageUploadResponse(image_id=image_id)
+    except ValueError as e:
+        # Handle case where image already exists (duplicate content)
+        logger.warning(f"Duplicate image upload attempt: {e}")
+        # Extract the ID from the error message if possible
+        if "ID:" in str(e):
+            existing_id = str(e).split("ID:")[1].split(",")[0].strip()
+            detail = f"Image already exists with ID: {existing_id}"
+        else:
+            detail = "Image with identical content already exists"
+        raise HTTPException(status_code=409, detail=detail)
     except Exception as e:
         logger.error(f"Failed to upload image: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}") 
