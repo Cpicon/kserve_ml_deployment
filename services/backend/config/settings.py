@@ -111,7 +111,7 @@ class Settings(BaseSettings):
         description="Logging level"
     )
     log_format: str = Field(
-        default="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        default="%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s",
         description="Log message format"
     )
     log_json: bool = Field(

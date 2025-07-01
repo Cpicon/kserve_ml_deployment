@@ -90,10 +90,63 @@ ruff check .       # lint/format check
 
 ## Docker
 
+### Building the Image
+
 ```bash
-docker build -t backend-service:latest .
-docker run -p 8000:80 backend-service:latest
+# Build the Docker image
+docker build -t aiq-circular-detection .
 ```
+
+### Running with Docker
+
+```bash
+# Run with default settings (dummy mode)
+docker run -d --name aiq-api -p 8000:8000 aiq-circular-detection
+
+# Run with environment variables
+docker run -d --name aiq-api \
+  -p 8000:8000 \
+  -e MODE=dummy \
+  -e LOG_LEVEL=INFO \
+  -v $(pwd)/data:/data \
+  -v $(pwd)/logs:/logs \
+  aiq-circular-detection
+
+# Check logs
+docker logs -f aiq-api
+
+# Stop and remove
+docker stop aiq-api && docker rm aiq-api
+```
+
+### Running with Docker Compose
+
+```bash
+# Start the service
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop the service
+docker-compose down
+
+# Rebuild and start (after code changes)
+docker-compose up -d --build
+```
+
+The service will be available at:
+- API: http://localhost:8000
+- Swagger UI: http://localhost:8000/docs
+- Health check: http://localhost:8000/health
+
+### Volumes
+
+The Docker setup uses two volumes for persistence:
+- `./data`: SQLite database and uploaded images
+- `./logs`: Application logs
+
+These directories are created automatically and persist data between container restarts.
 
 ---
 

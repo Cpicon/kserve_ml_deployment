@@ -1,0 +1,50 @@
+services:
+  api:
+    image: aiq-circular-detection:latest
+    container_name: aiq-circular-detection-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Application settings
+      - APP_NAME=AIQ Circular Detection Service
+      - ENVIRONMENT=${ENVIRONMENT:-local}
+      - DEBUG=${DEBUG:-false}
+      
+      # Database configuration
+      - DATABASE_URL=${DATABASE_URL:-sqlite:///data/db.sqlite3}
+      - DATABASE_ECHO=${DATABASE_ECHO:-false}
+      
+      # Storage configuration
+      - STORAGE_TYPE=${STORAGE_TYPE:-local}
+      - STORAGE_ROOT=/data/images
+      
+      # Metadata storage
+      - METADATA_STORAGE=${METADATA_STORAGE:-database}
+      
+      # API configuration
+      - API_PREFIX=/api/v1
+      - CORS_ORIGINS=["*"]
+      
+      # Model service configuration
+      - MODE=${MODE:-dummy}
+      - MODEL_SERVER_URL=${MODEL_SERVER_URL:-http://localhost:8080}
+      - MODEL_NAME=${MODEL_NAME:-circular-detector}
+      
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_JSON=true
+      - LOG_FILE=/logs/app.log
+    
+    volumes:
+      # Persistent data storage
+      - ./data:/data
+      - ./logs:/logs
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: unless-stopped 
