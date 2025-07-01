@@ -17,6 +17,7 @@ from aiq_circular_detection.schemas import (
     ImageUploadResponse,
     ObjectListSummaryResponse,
     ObjectSummary,
+    ObjectDetailResponse,
 )
 from aiq_circular_detection.storage.base import StorageClient
 from config import get_settings
@@ -224,11 +225,74 @@ async def list_image_objects(
         )
         summaries.append(summary)
     
-    logger.info(f"Found {len(summaries)} objects for image {image_id}")
+    logger.info(f"Listing {len(summaries)} objects for image {image_id}.")
     
     # Return the comprehensive response
     return ObjectListSummaryResponse(
         image_id=image_id,
         count=len(summaries),
         objects=summaries
+    )
+
+
+@app.get("/images/{image_id}/objects/{object_id}", response_model=ObjectDetailResponse, tags=["objects"])
+async def get_object_detail(
+    image_id: str,
+    object_id: str,
+    image_repo: ImageRepository = Depends(get_image_repository),
+    object_repo: CircularObjectDBRepository = Depends(get_object_db_repository)
+) -> ObjectDetailResponse:
+    """Get detailed information about a specific circular object.
+    
+    Args:
+        image_id: SHA-256 hash ID of the image
+        object_id: UUID of the circular object
+        image_repo: Image database repository
+        object_repo: Circular object database repository
+        
+    Returns:
+        ObjectDetailResponse: Detailed information about the circular object
+        
+    Raises:
+        HTTPException: If the image or object is not found
+    """
+    # Check if the image exists
+    if not image_repo.exists(image_id):
+        logger.warning(f"Image not found: {image_id}")
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    # Parse object_id as UUID
+    try:
+        from uuid import UUID
+        object_uuid = UUID(object_id)
+    except ValueError:
+        logger.warning(f"Invalid object ID format: {object_id}")
+        raise HTTPException(status_code=404, detail="Object not found")
+    
+    # Get the object
+    obj = object_repo.get_object(object_uuid)
+    
+    if not obj:
+        logger.warning(f"Object not found: {object_id}")
+        raise HTTPException(status_code=404, detail="Object not found")
+    
+    # Verify the object belongs to the specified image
+    if obj.image_id != image_id:
+        logger.warning(f"Object {object_id} does not belong to image {image_id}")
+        raise HTTPException(status_code=404, detail="Object not found")
+    
+    # Convert float bbox to int bbox
+    bbox_int = [int(coord) for coord in obj.bbox]
+    
+    # Extract centroid as tuple
+    centroid_tuple = (obj.centroid["x"], obj.centroid["y"])
+    
+    logger.info(f"Returning object {object_id} for image {image_id}.")
+    
+    # Return the detailed response
+    return ObjectDetailResponse(
+        object_id=obj.id,
+        bbox=bbox_int,
+        centroid=centroid_tuple,
+        radius=obj.radius
     ) 

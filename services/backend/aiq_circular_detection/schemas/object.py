@@ -1,6 +1,6 @@
 """Object-related Pydantic schemas for API responses."""
 
-from typing import List
+from typing import List, Tuple
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -124,4 +124,69 @@ class ObjectListSummaryResponse(BaseModel):
                 }
             ]
         ]
+    )
+
+
+class ObjectDetailResponse(BaseModel):
+    """Detailed response schema for a single circular object.
+    
+    This model provides comprehensive details about a detected circular object,
+    including its bounding box, centroid position, and radius.
+    """
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        # Enable JSON schema generation with examples
+        json_schema_extra={
+            "examples": [
+                {
+                    "object_id": "550e8400-e29b-41d4-a716-446655440000",
+                    "bbox": [10, 20, 30, 40],
+                    "centroid": [20.5, 30.5],
+                    "radius": 10.5
+                },
+                {
+                    "object_id": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+                    "bbox": [100, 150, 200, 250],
+                    "centroid": [150.0, 200.0],
+                    "radius": 50.0
+                }
+            ]
+        }
+    )
+    
+    object_id: UUID = Field(
+        ...,
+        description="Unique identifier for the detected circular object",
+        examples=[
+            "550e8400-e29b-41d4-a716-446655440000",
+            "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+        ]
+    )
+    
+    bbox: List[int] = Field(
+        ...,
+        description="Bounding box coordinates as [x_min, y_min, x_max, y_max] in integer pixels",
+        min_length=4,
+        max_length=4,
+        examples=[
+            [10, 20, 30, 40],
+            [100, 150, 200, 250]
+        ]
+    )
+    
+    centroid: Tuple[float, float] = Field(
+        ...,
+        description="Center point of the circular object as (x, y) coordinates in pixels",
+        examples=[
+            (20.5, 30.5),
+            (150.0, 200.0)
+        ]
+    )
+    
+    radius: float = Field(
+        ...,
+        gt=0,
+        description="Radius of the detected circular object in pixels",
+        examples=[10.5, 50.0, 25.75]
     ) 
