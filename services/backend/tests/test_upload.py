@@ -2,6 +2,7 @@
 import hashlib
 import io
 from pathlib import Path
+from unittest.mock import patch, Mock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -9,17 +10,31 @@ from PIL import Image
 
 from aiq_circular_detection.dependencies import get_image_repository
 from aiq_circular_detection.main import app
+from aiq_circular_detection.repositories import InMemoryImageRepository
+from aiq_circular_detection.storage.local import LocalStorageClient
+from config import get_settings
+
+
+# Override the dependency to always use in-memory repository for tests
+@pytest.fixture(scope="module")
+def test_repository():
+    """Create a test repository that persists across all tests in this module."""
+    return InMemoryImageRepository()
 
 
 @pytest.fixture(autouse=True)
-def clear_repository():
-    """Clear the image repository before each test."""
-    repository = get_image_repository()
-    if hasattr(repository, 'clear'):
-        repository.clear()
+def setup_test_app(test_repository):
+    """Override the repository dependency for tests."""
+    app.dependency_overrides[get_image_repository] = lambda: test_repository
+    # Clear repository before each test
+    if hasattr(test_repository, 'clear'):
+        test_repository.clear()
     yield
-    if hasattr(repository, 'clear'):
-        repository.clear()
+    # Clear repository after each test
+    if hasattr(test_repository, 'clear'):
+        test_repository.clear()
+    # Remove the override after tests
+    app.dependency_overrides.clear()
 
 
 def create_test_jpeg(width: int = 10, height: int = 10, seed: int = 0) -> bytes:
@@ -45,10 +60,9 @@ def create_test_jpeg(width: int = 10, height: int = 10, seed: int = 0) -> bytes:
     return img_bytes.read()
 
 
-def test_upload_image_success():
+def test_upload_image_success(test_repository):
     """Test successful image upload."""
     client = TestClient(app)
-    repository = get_image_repository()
     
     # Create test image data
     test_image = create_test_jpeg()
@@ -76,8 +90,8 @@ def test_upload_image_success():
     assert image_id == expected_id
     
     # Verify the mapping was stored in repository
-    assert repository.exists(image_id)
-    file_path = repository.get_path(image_id)
+    assert test_repository.exists(image_id)
+    file_path = test_repository.get_path(image_id)
     assert file_path.endswith(".jpg")
     
     # Verify the file exists on disk
@@ -100,7 +114,7 @@ def test_upload_image_empty_file():
 
 
 def test_upload_duplicate_image():
-    """Test uploading the same image twice returns 409 Conflict."""
+    """Test uploading the same image twice returns 409 Conflict and doesn't save duplicate files."""
     client = TestClient(app)
     
     # Create test image
@@ -114,23 +128,39 @@ def test_upload_duplicate_image():
     assert response1.status_code == 200
     image_id1 = response1.json()["image_id"]
     
-    # Upload same image again
-    response2 = client.post(
-        "/images/",
-        files={"file": ("test2.jpg", test_image, "image/jpeg")}
-    )
+    # Count files in storage directory before duplicate upload
+    storage_dir = Path("data/images")
+    if storage_dir.exists():
+        initial_file_count = len(list(storage_dir.glob("*.jpg")))
+    else:
+        initial_file_count = 0
     
-    # Should fail with 409 Conflict
-    assert response2.status_code == 409
-    detail = response2.json()["detail"]
-    assert "already exists" in detail
-    assert image_id1 in detail
+    # Mock the storage client to track if save_image is called
+    with patch.object(LocalStorageClient, 'save_image') as mock_save:
+        # Upload same image again
+        response2 = client.post(
+            "/images/",
+            files={"file": ("test2.jpg", test_image, "image/jpeg")}
+        )
+        
+        # Should fail with 409 Conflict
+        assert response2.status_code == 409
+        detail = response2.json()["detail"]
+        assert "already exists" in detail
+        assert image_id1 in detail
+        
+        # Verify save_image was NOT called (no I/O operation)
+        mock_save.assert_not_called()
+    
+    # Verify no new files were created
+    if storage_dir.exists():
+        final_file_count = len(list(storage_dir.glob("*.jpg")))
+        assert final_file_count == initial_file_count
 
 
-def test_upload_multiple_different_images():
+def test_upload_multiple_different_images(test_repository):
     """Test uploading multiple different images generates different IDs."""
     client = TestClient(app)
-    repository = get_image_repository()
     
     image_ids = []
     
@@ -151,7 +181,7 @@ def test_upload_multiple_different_images():
     
     # Verify all mappings exist
     for image_id in image_ids:
-        assert repository.exists(image_id)
+        assert test_repository.exists(image_id)
 
 
 def test_upload_large_filename():
@@ -180,10 +210,9 @@ def test_upload_large_filename():
     assert len(image_id) == 64
 
 
-def test_upload_png_as_jpeg():
+def test_upload_png_as_jpeg(test_repository):
     """Test uploading a PNG image (will be saved as .jpg by storage)."""
     client = TestClient(app)
-    repository = get_image_repository()
     
     # Create a PNG image
     img = Image.new("RGBA", (10, 10), color=(255, 0, 0, 128))
@@ -207,22 +236,19 @@ def test_upload_png_as_jpeg():
     assert data["image_id"] == expected_id
     
     # File should be saved with .jpg extension
-    file_path = repository.get_path(data["image_id"])
+    file_path = test_repository.get_path(data["image_id"])
     assert file_path.endswith(".jpg")
 
 
-def test_repository_isolation():
+def test_repository_isolation(test_repository):
     """Test that repository is properly isolated between tests."""
-    repository = get_image_repository()
-    
     # Repository should be empty at the start of the test
-    assert repository.count() == 0
+    assert test_repository.count() == 0
 
 
 def test_deterministic_ids():
     """Test that the same image content always produces the same ID."""
     client = TestClient(app)
-    _ = get_image_repository()
     
     # Create a specific image
     test_image = create_test_jpeg(width=20, height=20, seed=123)
@@ -236,4 +262,36 @@ def test_deterministic_ids():
     
     # The ID should be deterministic
     expected_id = hashlib.sha256(test_image).hexdigest()
-    assert response.json()["image_id"] == expected_id 
+    assert response.json()["image_id"] == expected_id
+
+
+def test_optimization_check_before_save():
+    """Test that the optimization checks repository before saving to storage."""
+    client = TestClient(app)
+    test_repository = InMemoryImageRepository()
+    app.dependency_overrides[get_image_repository] = lambda: test_repository
+    
+    try:
+        # Create test image
+        test_image = create_test_jpeg(seed=999)
+        image_id = hashlib.sha256(test_image).hexdigest()
+        
+        # Manually add to repository (simulating existing image)
+        test_repository.add_image(test_image, "fake/path.jpg")
+        
+        # Mock storage client to ensure it's not called
+        with patch('aiq_circular_detection.main.storage_client') as mock_storage:
+            # Upload the same image
+            response = client.post(
+                "/images/",
+                files={"file": ("test.jpg", test_image, "image/jpeg")}
+            )
+            
+            # Should return 409 without calling storage
+            assert response.status_code == 409
+            assert image_id in response.json()["detail"]
+            
+            # Verify storage client was never called
+            mock_storage.save_image.assert_not_called()
+    finally:
+        app.dependency_overrides.clear() 

@@ -1,6 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 from typing import Any
+import hashlib
 
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -89,6 +90,18 @@ def get_config() -> dict[str, Any]:
     }
 
 
+def _generate_image_id(content: bytes) -> str:
+    """Generate SHA-256 hash ID from image content.
+    
+    Args:
+        content: Raw image bytes
+        
+    Returns:
+        str: Hexadecimal SHA-256 hash of the content
+    """
+    return hashlib.sha256(content).hexdigest()
+
+
 @app.post("/images/", response_model=ImageUploadResponse)
 async def upload_image(
     file: UploadFile,
@@ -116,29 +129,49 @@ async def upload_image(
     if not content:
         raise HTTPException(status_code=400, detail="File cannot be empty")
     
+    # Generate ID from content
+    image_id = _generate_image_id(content)
+    logger.info(f"Processing image: {file.filename}, content length: {len(content)}, ID: {image_id}")
+    
+    # Check if image already exists in repository
+    if image_repository.exists(image_id):
+        # Image already exists, get its path and return
+        try:
+            existing_path = image_repository.get_path(image_id)
+            logger.info(f"Image already exists: {image_id} -> {existing_path}")
+            
+            # Return the existing image ID
+            detail = f"Image already exists with ID: {image_id}"
+            raise HTTPException(status_code=409, detail=detail)
+        except KeyError:
+            # This shouldn't happen, but handle gracefully
+            logger.error(f"Image {image_id} exists but path not found")
+            raise HTTPException(status_code=500, detail="Internal repository inconsistency")
+    
     try:
-        logger.info(f"Saving image: {file.filename}, content length: {len(content)}")
+        # Image doesn't exist, save it
+        logger.info(f"Saving new image: {image_id}")
         
         # Save the image using storage client
         file_path = storage_client.save_image(content)
         
-        # Add to repository (this generates the ID based on content)
-        image_id = image_repository.add_image(content, file_path)
+        # Add to repository
+        stored_id = image_repository.add_image(content, file_path)
         
-        logger.info(f"Uploaded image: {image_id} -> {file_path}")
+        # Verify the ID matches (it should)
+        if stored_id != image_id:
+            logger.error(f"ID mismatch: expected {image_id}, got {stored_id}")
+            raise HTTPException(status_code=500, detail="Internal ID generation inconsistency")
+        
+        logger.info(f"Successfully uploaded image: {image_id} -> {file_path}")
         
         # Return response with image ID (SHA-256 hash)
         return ImageUploadResponse(image_id=image_id)
+        
     except ValueError as e:
-        # Handle case where image already exists (duplicate content)
-        logger.warning(f"Duplicate image upload attempt: {e}")
-        # Extract the ID from the error message if possible
-        if "ID:" in str(e):
-            existing_id = str(e).split("ID:")[1].split(",")[0].strip()
-            detail = f"Image already exists with ID: {existing_id}"
-        else:
-            detail = "Image with identical content already exists"
-        raise HTTPException(status_code=409, detail=detail)
+        # This shouldn't happen since we already checked existence
+        logger.error(f"Unexpected duplicate during save: {e}")
+        raise HTTPException(status_code=500, detail="Unexpected error during save")
     except Exception as e:
         logger.error(f"Failed to upload image: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}") 

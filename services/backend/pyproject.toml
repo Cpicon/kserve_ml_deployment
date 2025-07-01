@@ -21,6 +21,10 @@ dependencies = [
   "pydantic>=2.11.7",
   "pydantic-settings>=2.0.0",
   "httpx>=0.28.0",
+  "torch>=2.7.1",
+  "torchvision>=0.22.1",
+  "transformers>=4.53.0",
+  "scipy>=1.16.0",
 ]
 
 [project.optional-dependencies]
