@@ -1,15 +1,24 @@
+import hashlib
 import logging
 from contextlib import asynccontextmanager
 from typing import Any
-import hashlib
 
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from aiq_circular_detection.dependencies import get_image_repository
+from aiq_circular_detection.dependencies import (
+    get_image_repository,
+    get_object_db_repository,
+    get_storage_client,
+)
 from aiq_circular_detection.repositories import ImageRepository
-from aiq_circular_detection.schemas import ImageUploadResponse
-from aiq_circular_detection.storage.local import LocalStorageClient
+from aiq_circular_detection.repositories.object_db import CircularObjectDBRepository
+from aiq_circular_detection.schemas import (
+    ImageUploadResponse,
+    ObjectListSummaryResponse,
+    ObjectSummary,
+)
+from aiq_circular_detection.storage.base import StorageClient
 from config import get_settings
 
 # Get settings and configure logging before anything else
@@ -18,9 +27,6 @@ settings.configure_logging()
 
 # Create logger for this module
 logger = logging.getLogger(__name__)
-
-# Initialize storage client
-storage_client = LocalStorageClient()
 
 
 @asynccontextmanager
@@ -105,7 +111,8 @@ def _generate_image_id(content: bytes) -> str:
 @app.post("/images/", response_model=ImageUploadResponse)
 async def upload_image(
     file: UploadFile,
-    image_repository: ImageRepository = Depends(get_image_repository)
+    image_repository: ImageRepository = Depends(get_image_repository),
+    storage_client: StorageClient = Depends(get_storage_client)
 ) -> ImageUploadResponse:
     """Upload an image file.
     
@@ -115,17 +122,18 @@ async def upload_image(
     Args:
         file: The uploaded image file.
         image_repository: Repository for storing image metadata.
+        storage_client: Client for storing the actual image files.
         
     Returns:
         ImageUploadResponse: Response containing the unique image ID.
         
     Raises:
-        HTTPException: If the file is empty, already exists, or cannot be saved.
+        HTTPException: If the file is empty, it already exists or cannot be saved.
     """
     # Read the file content
     content = await file.read()
     
-    # Check if file is empty
+    # Check if a file is empty
     if not content:
         raise HTTPException(status_code=400, detail="File cannot be empty")
     
@@ -133,7 +141,7 @@ async def upload_image(
     image_id = _generate_image_id(content)
     logger.info(f"Processing image: {file.filename}, content length: {len(content)}, ID: {image_id}")
     
-    # Check if image already exists in repository
+    # Check if the image already exists in the repository
     if image_repository.exists(image_id):
         # Image already exists, get its path and return
         try:
@@ -152,7 +160,7 @@ async def upload_image(
         # Image doesn't exist, save it
         logger.info(f"Saving new image: {image_id}")
         
-        # Save the image using storage client
+        # Save the image using a storage client
         file_path = storage_client.save_image(content)
         
         # Add to repository
@@ -174,4 +182,53 @@ async def upload_image(
         raise HTTPException(status_code=500, detail="Unexpected error during save")
     except Exception as e:
         logger.error(f"Failed to upload image: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}")
+
+
+@app.get("/images/{image_id}/objects", response_model=ObjectListSummaryResponse, tags=["objects"])
+async def list_image_objects(
+    image_id: str,
+    image_repo: ImageRepository = Depends(get_image_repository),
+    object_repo: CircularObjectDBRepository = Depends(get_object_db_repository)
+) -> ObjectListSummaryResponse:
+    """List all circular objects detected in a specific image.
+    
+    Args:
+        image_id: SHA-256 hash ID of the image
+        image_repo: Image database repository
+        object_repo: Circular object database repository
+        
+    Returns:
+        ObjectListSummaryResponse: Response containing image metadata and list of object summaries
+        
+    Raises:
+        HTTPException: If the image is not found
+    """
+    # Check if the image exists
+    if not image_repo.exists(image_id):
+        logger.warning(f"Image not found: {image_id}")
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    # Get all objects for this image
+    objects = object_repo.list_objects(image_id=image_id)
+    
+    # Convert to ObjectSummary instances
+    summaries = []
+    for obj in objects:
+        # Convert float bbox to int bbox
+        bbox_int = [int(coord) for coord in obj.bbox]
+        
+        summary = ObjectSummary(
+            object_id=obj.id,
+            bbox=bbox_int
+        )
+        summaries.append(summary)
+    
+    logger.info(f"Found {len(summaries)} objects for image {image_id}")
+    
+    # Return the comprehensive response
+    return ObjectListSummaryResponse(
+        image_id=image_id,
+        count=len(summaries),
+        objects=summaries
+    ) 

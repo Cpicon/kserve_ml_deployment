@@ -5,11 +5,11 @@ from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
-from sqlalchemy import create_engine, event, inspect, MetaData
+from sqlalchemy import MetaData, create_engine, event, inspect
 from sqlalchemy.orm import Session, sessionmaker
 
 from aiq_circular_detection.db.database import get_db
-from aiq_circular_detection.models import Base, Image, CircularObject
+from aiq_circular_detection.models import Base, CircularObject, Image
 
 
 @pytest.fixture
@@ -76,6 +76,7 @@ class TestDatabaseConfiguration:
         
         # Re-import to get fresh module with mocked settings
         import importlib
+
         import aiq_circular_detection.db.database as db_module
         importlib.reload(db_module)
         

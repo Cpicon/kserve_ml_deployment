@@ -71,7 +71,7 @@ class Settings(BaseSettings):
             return Path(v)
         return v
     
-    # Database Configuration (for metadata and future use)
+    # Database Configuration (for metadata)
     database_url: str = Field(
         default="sqlite:///data/db.sqlite3",
         description="Database connection URL"
