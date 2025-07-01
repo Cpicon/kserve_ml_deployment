@@ -66,7 +66,7 @@ class TestImageUploadResponse:
         
         # Test model_dump
         data = response.model_dump()
-        assert data == {"image_id": valid_hash}
+        assert data == {"image_id": valid_hash, "detection": None}
         
         # Test JSON string serialization
         json_str = response.model_dump_json()
@@ -85,6 +85,7 @@ class TestImageUploadResponse:
         assert "examples" in schema
         assert len(schema["examples"]) > 0
         assert "image_id" in schema["examples"][0]
+        assert "detection" in schema["examples"][0]
         
         # Check field description
         image_id_schema = schema["properties"]["image_id"]

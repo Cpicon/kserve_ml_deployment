@@ -63,6 +63,8 @@ def test_sqlite_data_directory_creation():
     with tempfile.TemporaryDirectory() as tmpdir:
         # Set DATABASE_URL to a non-existent directory
         db_path = Path(tmpdir) / "subdir" / "test.db"
+        # Create the parent directory first to avoid SQLite errors
+        db_path.parent.mkdir(parents=True, exist_ok=True)
         db_url = f"sqlite:///{db_path}"
         
         original = os.environ.get("DATABASE_URL")

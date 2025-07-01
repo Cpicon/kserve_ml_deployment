@@ -33,7 +33,7 @@ class TestSettings:
         assert settings.database_echo is False
         
         # Model Service Configuration
-        assert settings.model_service_url is None
+        assert settings.model_server_url is None
         assert settings.model_service_timeout == 30
         assert settings.model_service_retries == 3
         
