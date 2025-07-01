@@ -1,11 +1,14 @@
 """Image-related Pydantic schemas for API responses."""
 
+from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from .detection import DetectionResponse
+
 
 class ImageUploadResponse(BaseModel):
-    """Response model for successful image upload.
+    """Response model for a successful image upload.
     
     This model is returned when an image is successfully uploaded
     and stored in the system. The image_id can be used to retrieve
@@ -13,6 +16,8 @@ class ImageUploadResponse(BaseModel):
     
     The image_id is a SHA-256 hash of the image content, ensuring
     that duplicate images are detected and the same ID is returned.
+    
+    The response also includes detection results from the model inference.
     """
     
     model_config = ConfigDict(
@@ -20,13 +25,19 @@ class ImageUploadResponse(BaseModel):
         json_schema_extra={
             "examples": [
                 {
-                    "image_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-                },
-                {
-                    "image_id": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
-                },
-                {
-                    "image_id": "2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae"
+                    "image_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    "detection": {
+                        "detections": [
+                            {
+                                "object_id": "550e8400-e29b-41d4-a716-446655440000",
+                                "image_id": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                                "bbox": [10.0, 10.0, 50.0, 50.0],
+                                "centroid": {"x": 30.0, "y": 30.0},
+                                "radius": 20.0
+                            }
+                        ],
+                        "count": 1
+                    }
                 }
             ]
         }
@@ -44,6 +55,12 @@ class ImageUploadResponse(BaseModel):
             "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3"
         ]
+    )
+    
+    detection: Optional[DetectionResponse] = Field(
+        None,
+        description="Detection results from model inference. "
+                    "May be None if inference fails or is disabled."
     )
     
     @field_validator("image_id", mode="before")

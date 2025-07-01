@@ -82,9 +82,19 @@ class Settings(BaseSettings):
     )
     
     # Model Service Configuration
-    model_service_url: Optional[str] = Field(
+    mode: Literal["real", "dummy"] = Field(
+        default="dummy",
+        description="Operation mode: 'real' for actual model inference, 'dummy' for mock responses"
+    )
+    model_server_url: Optional[str] = Field(
         default=None,
-        description="URL of the KServe model service"
+        alias="MODEL_SERVER_URL",
+        description="Base URL of the model inference server"
+    )
+    model_name: str = Field(
+        default="circular-detector",
+        alias="MODEL_NAME",
+        description="Name of the model for inference endpoint"
     )
     model_service_timeout: int = Field(
         default=30,

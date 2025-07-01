@@ -38,4 +38,4 @@ echo -e "${BLUE}API Documentation: http://localhost:8000/docs${NC}"
 echo -e "${BLUE}Health check: http://localhost:8000/health${NC}"
 echo -e "${BLUE}Configuration: http://localhost:8000/config${NC}"
 
-uv run --active fastapi dev aiq_circular_detection
+METADATA_STORAGE=database MODE=dummy MODEL_NAME="circular-detector" uv run --active fastapi dev aiq_circular_detection

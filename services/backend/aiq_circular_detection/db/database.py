@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 # Get settings
 settings = get_settings()
 
-# Ensure data directory exists if using SQLite
+# Ensure a data directory exists if using SQLite
 if settings.database_url.startswith("sqlite:///"):
-    # Extract path from sqlite URL (sqlite:///path/to/db.sqlite3)
+    # Extract a path from sqlite URL (sqlite:///path/to/db.sqlite3)
     db_path = settings.database_url.replace("sqlite:///", "")
     db_dir = Path(db_path).parent
     db_dir.mkdir(parents=True, exist_ok=True)
@@ -69,7 +69,7 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db() -> None:
-    """Initialize database by creating all tables.
+    """Initialize a database by creating all tables.
     
     This should be called on application startup.
     """
