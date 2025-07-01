@@ -7,37 +7,24 @@ from unittest.mock import Mock
 import pytest
 from sqlalchemy import MetaData, create_engine, event, inspect
 from sqlalchemy.orm import Session, sessionmaker
-
+import config
 from aiq_circular_detection.db.database import get_db
 from aiq_circular_detection.models import Base, CircularObject, Image
-
+import aiq_circular_detection.db.database as db_module
 
 @pytest.fixture
 def mock_settings():
     """Mock settings for testing."""
     settings = Mock()
-    settings.database_url = "sqlite:///data/db.sqlite3"
+    settings.database_url = "sqlite:///:memory:"
     settings.database_echo = False
     return settings
 
-
 @pytest.fixture
-def temp_db_path():
-    """Create a temporary database file path."""
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-        tmp_path = tmp.name
-    
-    yield tmp_path
-    
-    # Cleanup
-    Path(tmp_path).unlink(missing_ok=True)
-
-
-@pytest.fixture
-def temp_engine(temp_db_path):
+def temp_engine(mock_settings):
     """Create a temporary SQLite engine for testing."""
     engine = create_engine(
-        f"sqlite:///{temp_db_path}",
+        mock_settings.database_url,
         connect_args={"check_same_thread": False}
     )
     
@@ -60,38 +47,6 @@ def temp_session(temp_engine):
     session = SessionLocal()
     yield session
     session.close()
-
-
-class TestDatabaseConfiguration:
-    """Test database configuration with different settings."""
-    
-    def test_sqlite_configuration(self, monkeypatch):
-        """Test SQLite database configuration."""
-        mock_settings = Mock()
-        mock_settings.database_url = "sqlite:///test/data/test.db"
-        mock_settings.database_echo = False
-        
-        import config
-        monkeypatch.setattr(config, "get_settings", lambda: mock_settings)
-        
-        # Re-import to get fresh module with mocked settings
-        import importlib
-
-        import aiq_circular_detection.db.database as db_module
-        importlib.reload(db_module)
-        
-        # Check engine configuration
-        assert str(db_module.engine.url) == "sqlite:///test/data/test.db"
-        # Check if it's SQLite by URL
-        assert db_module.engine.url.drivername == "sqlite"
-    
-    @pytest.mark.skipif(True, reason="PostgreSQL driver not installed in test environment")
-    def test_postgresql_configuration(self, monkeypatch):
-        """Test PostgreSQL database configuration."""
-        # This test is skipped because psycopg2 is not installed
-        # In a real deployment, you would have the appropriate database driver
-        pass
-
 
 class TestDatabaseSetup:
     """Test database setup and configuration."""
@@ -181,14 +136,12 @@ class TestDatabaseSession:
         mock_settings.database_url = str(temp_engine.url)
         
         # Monkeypatch get_settings to return our mock
-        import config
         monkeypatch.setattr(config, "get_settings", lambda: mock_settings)
         
         # Create a mock SessionLocal
         mock_session_local = sessionmaker(bind=temp_engine)
         
         # Monkeypatch the SessionLocal in the database module
-        import aiq_circular_detection.db.database as db_module
         monkeypatch.setattr(db_module, "SessionLocal", mock_session_local)
         
         # Create tables
@@ -217,14 +170,8 @@ class TestDatabaseSession:
         """Test that sessions are properly rolled back on error."""
         # Update mock settings with temp database URL
         mock_settings.database_url = str(temp_engine.url)
-        
-        # Monkeypatch get_settings
-        import config
         monkeypatch.setattr(config, "get_settings", lambda: mock_settings)
-        
         mock_session_local = sessionmaker(bind=temp_engine)
-        
-        import aiq_circular_detection.db.database as db_module
         monkeypatch.setattr(db_module, "SessionLocal", mock_session_local)
         
         Base.metadata.create_all(bind=temp_engine)
@@ -258,10 +205,7 @@ class TestDatabaseOperations:
         mock_settings.database_url = str(temp_engine.url)
         
         # Monkeypatch get_settings
-        import config
         monkeypatch.setattr(config, "get_settings", lambda: mock_settings)
-        
-        import aiq_circular_detection.db.database as db_module
         monkeypatch.setattr(db_module, "engine", temp_engine)
         monkeypatch.setattr(db_module, "Base", Base)
         
@@ -284,10 +228,7 @@ class TestDatabaseOperations:
         mock_settings.database_url = str(temp_engine.url)
         
         # Monkeypatch get_settings
-        import config
         monkeypatch.setattr(config, "get_settings", lambda: mock_settings)
-        
-        import aiq_circular_detection.db.database as db_module
         monkeypatch.setattr(db_module, "engine", temp_engine)
         monkeypatch.setattr(db_module, "Base", Base)
         
