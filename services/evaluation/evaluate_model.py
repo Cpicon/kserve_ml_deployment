@@ -16,8 +16,8 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 COCO_JSON_PATH = os.path.join(SCRIPT_DIR, "dataset", "_annotations.coco.json")
 # COCO_JSON_PATH = "dataset/_annotations.coco.json"
 N_IMAGES_TO_PROCESS = 190
-# TODO: iterate over the iou threshold to compute the ROC curve
-IOU_THRESHOLD = 0.5
+# Iterate over multiple IoU thresholds to compute precision-recall curves
+IOU_THRESHOLDS = [0.3, 0.5, 0.7, 0.9]  # Multiple thresholds for evaluation
 
 
 class BoundingBox(BaseModel):
@@ -286,17 +286,20 @@ def hungarian_assignment(predictions: list[Prediction], ground_truths: list[Boun
     matched_ground_truths = set()
 
     # Check assignments from Hungarian algorithm
-    # TODO: check if the assignment is correct
+    # The Hungarian algorithm finds the optimal assignment that minimizes total cost (maximizes total IoU)
+    # We only count assignments as true positives if they meet the IoU threshold
+    # This ensures high-quality matches while allowing low-IoU pairs to remain unmatched
     for pred_idx, gt_idx in zip(pred_indices, gt_indices):
         iou = iou_matrix[pred_idx, gt_idx]
         if iou >= iou_threshold:
-            # Valid match
+            # Valid match - this is a true positive
             tp_count += 1
             matched_predictions.add(pred_idx)
             matched_ground_truths.add(gt_idx)
             assignments.append(Assignment(prediction_bounding_box=predictions[pred_idx].bounding_box,
                                           ground_truth_bounding_box=ground_truths[gt_idx], iou=float(iou)))
         # If IoU is below threshold, both prediction and GT remain unmatched
+        # This correctly handles cases where Hungarian assigns low-quality matches
 
     # Count false positives (unmatched predictions)
     fp_count = len(predictions) - len(matched_predictions)
@@ -496,12 +499,16 @@ async def main():
     jaccard_indices = []  # Store Jaccard indices for all images
     gt_counts = []  # Store ground truth counts for each image
 
-    # F1 score tracking variables
-    total_tp = 0
-    total_fp = 0
-    total_fn = 0
+    # Store metrics for each IoU threshold
+    threshold_metrics = {}
+    for threshold in IOU_THRESHOLDS:
+        threshold_metrics[threshold] = {
+            'total_tp': 0,
+            'total_fp': 0,
+            'total_fn': 0
+        }
 
-    print(f"🎯 Using IoU threshold: {IOU_THRESHOLD}")
+    print(f"🎯 Using IoU thresholds: {IOU_THRESHOLDS}")
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         for idx, (image, image_name, image_path) in enumerate(zip(images_to_process, image_names, image_paths)):
@@ -557,24 +564,32 @@ async def main():
 
             print(f"  Found {len(predictions)} objects")
 
-            # Compute Hungarian assignment and F1 metrics for this image
-            print("  Computing Hungarian assignment...")
-            assignment = hungarian_assignment(
+            # Compute Hungarian assignment and F1 metrics for this image at each threshold
+            print("  Computing Hungarian assignments for different IoU thresholds...")
+            
+            for iou_threshold in IOU_THRESHOLDS:
+                assignment = hungarian_assignment(
+                    predictions,
+                    image_to_bounding_boxes[image_name],
+                    iou_threshold
+                )
+
+                print(f"    IoU={iou_threshold}: TP: {assignment.tp_count}, FP: {assignment.fp_count}, FN: {assignment.fn_count}")
+
+                # Add to totals for this threshold
+                threshold_metrics[iou_threshold]['total_tp'] += assignment.tp_count
+                threshold_metrics[iou_threshold]['total_fp'] += assignment.fp_count
+                threshold_metrics[iou_threshold]['total_fn'] += assignment.fn_count
+
+            # Show assignments for the default threshold (0.5)
+            default_assignment = hungarian_assignment(
                 predictions,
                 image_to_bounding_boxes[image_name],
-                IOU_THRESHOLD
+                0.5
             )
-
-            print(f"  {image_name}: TP: {assignment.tp_count}, FP: {assignment.fp_count}, FN: {assignment.fn_count}")
-
-            # Add to totals
-            total_tp += assignment.tp_count
-            total_fp += assignment.fp_count
-            total_fn += assignment.fn_count
-
-            if assignment.assignments:
+            if default_assignment.assignments:
                 print(f"    Assignments:")
-                for assign in assignment.assignments:
+                for assign in default_assignment.assignments:
                     print(
                         f"      Prediction {assign.prediction_bounding_box} -> GT {assign.ground_truth_bounding_box} (IoU: {assign.iou:.3f})")
 
@@ -616,8 +631,15 @@ async def main():
             image_with_boxes.save(output_filename)
             print(f"  Saved annotated image to: {output_filename}")
 
-    # Compute F1 metrics
-    metrics = compute_metrics(total_tp, total_fp, total_fn)
+    # Compute F1 metrics for each threshold
+    all_metrics = {}
+    for threshold in IOU_THRESHOLDS:
+        metrics = compute_metrics(
+            threshold_metrics[threshold]['total_tp'],
+            threshold_metrics[threshold]['total_fp'],
+            threshold_metrics[threshold]['total_fn']
+        )
+        all_metrics[threshold] = metrics
 
     # Print Jaccard Index statistics
     print(f"\n{'=' * 60}")
@@ -651,17 +673,22 @@ async def main():
         print(f"📏 Maximum Jaccard Index: {max_jaccard:.4f}")
         print(f"🏷️  Total ground truth objects: {total_weight}")
 
-    # Print F1 Score statistics
+    # Print F1 Score statistics for each threshold
     print(f"\n{'=' * 60}")
-    print("📊 F1 SCORE RESULTS")
+    print("📊 F1 SCORE RESULTS (PRECISION-RECALL CURVE)")
     print(f"{'=' * 60}")
-    print(f"🎯 IoU Threshold: {IOU_THRESHOLD}")
-    print(f"✅ Total True Positives (TP): {total_tp}")
-    print(f"❌ Total False Positives (FP): {total_fp}")
-    print(f"⭕ Total False Negatives (FN): {total_fn}")
-    print(f"📊 Precision: {metrics.precision:.4f}")
-    print(f"📊 Recall: {metrics.recall:.4f}")
-    print(f"🎯 F1 Score: {metrics.f1_score:.4f}")
+    print(f"🎯 IoU Thresholds: {IOU_THRESHOLDS}")
+    print(f"\n{'IoU':<10} {'TP':<10} {'FP':<10} {'FN':<10} {'Precision':<12} {'Recall':<12} {'F1-Score':<12}")
+    print("-" * 82)
+    
+    for threshold in IOU_THRESHOLDS:
+        tp = threshold_metrics[threshold]['total_tp']
+        fp = threshold_metrics[threshold]['total_fp']
+        fn = threshold_metrics[threshold]['total_fn']
+        metrics = all_metrics[threshold]
+        
+        print(f"{threshold:<10.2f} {tp:<10} {fp:<10} {fn:<10} "
+              f"{metrics.precision:<12.4f} {metrics.recall:<12.4f} {metrics.f1_score:<12.4f}")
 
     print(f"\nProcess completed successfully!")
     print(f"Processed {len(images_to_process)} images")
