@@ -106,7 +106,6 @@ echo ""
 echo "Available endpoints:"
 echo "  - Health: $INGRESS_URL/health"
 echo "  - API Docs: $INGRESS_URL/docs"
-echo "  - API: $INGRESS_URL/api/v1/*"
 echo ""
 echo -e "${BLUE}Press Ctrl+C to stop port forwarding${NC}"
 
