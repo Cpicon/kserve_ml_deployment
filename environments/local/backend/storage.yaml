@@ -1,0 +1,31 @@
+# PersistentVolume for kind cluster (using hostPath)
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: aiq-storage-pv
+  labels:
+    type: local
+spec:
+  storageClassName: ""  # Empty string for static provisioning
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce  # SQLite requires exclusive access
+  hostPath:
+    path: "/tmp/aiq-storage"  # This path is on the kind node
+  claimRef:
+    namespace: aiq-backend
+    name: aiq-storage-pvc
+---
+# PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: aiq-storage-pvc
+spec:
+  storageClassName: ""  # Empty string to match PV
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi 

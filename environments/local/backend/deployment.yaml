@@ -1,0 +1,128 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aiq-circular-detection
+  labels:
+    app: aiq-circular-detection
+spec:
+  replicas: 1  # SQLite doesn't support concurrent writes
+  selector:
+    matchLabels:
+      app: aiq-circular-detection
+  template:
+    metadata:
+      labels:
+        app: aiq-circular-detection
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: "true"  # Enable Istio sidecar injection
+    spec:
+      containers:
+      - name: api
+        image: aiq-circular-detection:latest
+        imagePullPolicy: Never  # For local kind images
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        # Application settings from ConfigMap
+        - name: APP_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: aiq-config
+              key: app_name
+        - name: ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: aiq-config
+              key: environment
+        - name: LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: aiq-config
+              key: log_level
+        - name: STORAGE_TYPE
+          valueFrom:
+            configMapKeyRef:
+              name: aiq-config
+              key: storage_type
+        
+        # Fixed configuration values
+        - name: DEBUG
+          value: "false"
+        - name: LOG_JSON
+          value: "true"
+        - name: STORAGE_ROOT
+          value: "/data/images"
+        - name: DATABASE_URL
+          value: "sqlite:///data/db.sqlite3"
+        - name: METADATA_STORAGE
+          value: "database"
+        - name: API_PREFIX
+          value: "/api/v1"
+        - name: CORS_ORIGINS
+          value: '["*"]'
+        
+        # Model settings (could also be in ConfigMap)
+        - name: MODE
+          value: "dummy"  # Change to "real" if model is deployed
+        - name: MODEL_SERVER_URL
+          value: "http://circular-detector-predictor-default.default.svc.cluster.local/v1/models/circular-detector:predict"
+        - name: MODEL_NAME
+          value: "circular-detector"
+        
+        # Resources (adjusted for local development)
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # Health checks
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+        
+        # Volume mounts
+        volumeMounts:
+        - name: storage
+          mountPath: /data
+          subPath: data  # Separate data directory
+        - name: storage
+          mountPath: /logs
+          subPath: logs  # Separate logs directory
+      
+      volumes:
+      - name: storage
+        persistentVolumeClaim:
+          claimName: aiq-storage-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: aiq-circular-detection
+  labels:
+    app: aiq-circular-detection
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: aiq-circular-detection 

@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aiq-config
+data:
+  # Application settings
+  app_name: "AIQ Circular Detection Service"
+  environment: "local"  # Local Kind deployment
+  
+  # Logging
+  log_level: "INFO"
+  
+  # Storage
+  storage_type: "local"  # Local storage for Kind cluster
+  
+---
+# Example ConfigMap for different environments
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aiq-config-dev
+data:
+  app_name: "AIQ Circular Detection Service (Dev)"
+  environment: "dev"
+  log_level: "DEBUG"
+  storage_type: "local" 
