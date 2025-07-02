@@ -1,6 +1,7 @@
 #!/bin/bash
 # run_all_local.sh - Run all services locally for development and testing
-# This script starts the model server, backend service, and runs integration tests
+# This script starts the model server, backend service, runs integration tests,
+# and optionally performs model evaluation if a dataset is available
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -222,9 +223,73 @@ if [ $TEST_RESULT -ne 0 ]; then
     exit 1
 fi
 
+# Step 4: Run Model Evaluation (Optional)
+echo -e "\n${BOLD}${CYAN}Step 4: Running Model Evaluation${NC}"
+echo -e "${CYAN}====================================${NC}"
+
+EVALUATION_DIR="${PROJECT_ROOT}/services/evaluation"
+EVALUATION_LOG="${LOG_DIR}/evaluation.log"
+
+# Check if evaluation dataset exists
+if [ -d "${EVALUATION_DIR}/dataset" ] && [ -f "${EVALUATION_DIR}/dataset/_annotations.coco.json" ]; then
+    echo -e "${BLUE}Evaluation dataset found. Running model evaluation...${NC}"
+    echo -e "${YELLOW}This may take a few minutes depending on dataset size...${NC}"
+    
+    cd "${EVALUATION_DIR}" || exit 1
+    
+    # Run evaluation and capture output
+    if ./run_evaluation.sh > "${EVALUATION_LOG}" 2>&1; then
+        echo -e "${GREEN}✅ Model evaluation completed successfully!${NC}"
+        
+        # Extract and display key metrics from the log
+        echo -e "\n${BOLD}${CYAN}Model Performance Summary:${NC}"
+        echo -e "${CYAN}================================================${NC}"
+        
+        # Extract F1 Score results
+        if grep -A 10 "F1 SCORE RESULTS" "${EVALUATION_LOG}" > /dev/null; then
+            echo -e "${GREEN}F1 Score Metrics:${NC}"
+            grep -E "IoU Threshold:|True Positives|False Positives|False Negatives|Precision:|Recall:|F1 Score:" "${EVALUATION_LOG}" | tail -7 | sed 's/^/  /'
+        fi
+        
+        # Extract Jaccard Index results
+        if grep -A 10 "JACCARD INDEX RESULTS" "${EVALUATION_LOG}" > /dev/null; then
+            echo -e "\n${GREEN}Jaccard Index Metrics:${NC}"
+            grep -E "Simple Average|Weighted Average|Minimum|Maximum|Total ground truth" "${EVALUATION_LOG}" | tail -5 | sed 's/^/  /'
+        fi
+        
+        echo -e "${CYAN}================================================${NC}"
+        echo -e "${YELLOW}Full evaluation log: ${EVALUATION_LOG}${NC}"
+        echo -e "${YELLOW}Annotated images saved in: ${EVALUATION_DIR}/output/${NC}"
+        
+        EVAL_RESULT=0
+    else
+        echo -e "${RED}❌ Model evaluation failed!${NC}"
+        echo -e "${YELLOW}Check the evaluation log: ${EVALUATION_LOG}${NC}"
+        echo -e "${YELLOW}Last 20 lines of evaluation log:${NC}"
+        tail -20 "${EVALUATION_LOG}"
+        EVAL_RESULT=1
+    fi
+    
+    cd "${PROJECT_ROOT}" || exit 1
+else
+    echo -e "${YELLOW}⚠️  Evaluation dataset not found. Skipping model evaluation.${NC}"
+    echo -e "${BLUE}To enable evaluation, add your dataset to: ${EVALUATION_DIR}/dataset/${NC}"
+    echo -e "${BLUE}Required files:${NC}"
+    echo -e "  - ${EVALUATION_DIR}/dataset/_annotations.coco.json"
+    echo -e "  - ${EVALUATION_DIR}/dataset/*.jpg (image files)"
+    EVAL_RESULT=0  # Don't fail if evaluation dataset is not present
+fi
+
 echo ""
 if [ $TEST_RESULT -eq 0 ]; then
     echo -e "${BOLD}${GREEN}✅ All tests passed!${NC}"
+    
+    # Show evaluation status if it was run
+    if [ -n "${EVAL_RESULT+x}" ]; then
+        if [ $EVAL_RESULT -eq 0 ] && [ -f "${EVALUATION_LOG}" ]; then
+            echo -e "${BOLD}${GREEN}✅ Model evaluation completed!${NC}"
+        fi
+    fi
     
     # Print service information
     echo -e "\n${BOLD}${CYAN}Services Running:${NC}"
@@ -240,6 +305,15 @@ if [ $TEST_RESULT -eq 0 ]; then
     echo -e "  - API Docs: http://localhost:$BACKEND_PORT/docs"
     echo -e "  - PID: $BACKEND_PID"
     echo -e "  - Log: $BACKEND_LOG"
+    
+    # Add evaluation info if available
+    if [ -n "${EVAL_RESULT+x}" ] && [ -f "${EVALUATION_LOG}" ]; then
+        echo ""
+        echo -e "${GREEN}Model Evaluation:${NC}"
+        echo -e "  - Log: $EVALUATION_LOG"
+        echo -e "  - Output: ${EVALUATION_DIR}/output/"
+    fi
+    
     echo -e "${CYAN}================================================${NC}"
     
     # Interactive mode
@@ -248,6 +322,12 @@ if [ $TEST_RESULT -eq 0 ]; then
     echo -e "  - Test the API at http://localhost:$BACKEND_PORT/docs"
     echo -e "  - View model server at http://localhost:$MODEL_PORT/docs"
     echo -e "  - Check logs in the $LOG_DIR directory"
+    if [ -n "${EVAL_RESULT+x}" ] && [ -f "${EVALUATION_LOG}" ]; then
+        echo -e "  - Review evaluation results in $EVALUATION_LOG"
+        echo -e "  - View annotated images in ${EVALUATION_DIR}/output/"
+    else
+        echo -e "  - Run evaluation: cd services/evaluation && ./run_evaluation.sh"
+    fi
     
     # Wait for user to press Ctrl+C
     wait

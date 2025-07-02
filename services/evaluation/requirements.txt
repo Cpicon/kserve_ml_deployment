@@ -1,0 +1,14 @@
+# Core dependencies - matching model server versions
+torch>=2.0.0
+torchvision>=0.15.0
+transformers>=4.30.0
+pillow>=9.5.0
+pydantic>=2.0.0
+numpy>=1.24.0
+
+# HTTP client for API calls
+httpx>=0.25.0
+
+# Evaluation specific dependencies
+scipy>=1.10.0  # For Hungarian algorithm
+matplotlib>=3.7.0  # For potential visualizations 
