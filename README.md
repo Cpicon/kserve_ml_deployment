@@ -219,6 +219,71 @@ sequenceDiagram
    kubectl apply -n kserve-test -f environments/local/test/sklearn-iris.yaml
    ```
 
+### Local Development Testing (No Kubernetes/Docker)
+
+For rapid development and testing without Kubernetes or Docker, you can run all services locally on your machine.
+
+#### Prerequisites for Local Testing
+
+- Python 3.9+ installed
+- `uv` - Fast Python package manager ([installation guide](https://github.com/astral-sh/uv))
+- `jq` - JSON processor
+- Available ports: 8000 (backend) and 9090 (model server)
+
+#### One-Command Local Testing
+
+Run all services and tests with a single command:
+
+```bash
+./run_all_local.sh
+```
+
+This script will:
+1. Start the AI model server on port 9090
+2. Start the backend API service on port 8000
+3. Run integration tests automatically
+4. Keep services running for manual testing
+
+The script handles:
+- Prerequisite checking
+- Port availability verification
+- Service health monitoring
+- Automatic cleanup on exit
+- Detailed logging to `logs/` directory
+
+#### Manual Local Testing
+
+If you prefer to run services individually:
+
+1. **Start the Model Server**:
+   ```bash
+   cd environments/local/aiq_detector
+   ./run_local.sh
+   # Model server will run on http://localhost:9090
+   # Swagger UI: http://localhost:9090/docs
+   ```
+
+2. **Start the Backend Service** (in a new terminal):
+   ```bash
+   cd services/backend
+   ./start-dev-real.sh
+   # Backend API will run on http://localhost:8000
+   # API Docs: http://localhost:8000/docs
+   ```
+
+3. **Run Integration Tests** (in a new terminal):
+   ```bash
+   cd services/backend
+   ./test_full_integration.sh
+   ```
+
+#### Troubleshooting Local Development
+
+- **Port conflicts**: Ensure ports 8000 and 9090 are free
+- **Model download**: First run downloads the AI model (~300MB)
+- **Logs**: Check `logs/model_server.log` and `logs/backend_server.log`
+- **Cleanup**: Use `Ctrl+C` to stop all services gracefully
+
 ### API Endpoints
 
 Once deployed, the backend service provides:
