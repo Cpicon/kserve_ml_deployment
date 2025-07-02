@@ -173,6 +173,7 @@ sequenceDiagram
 │       ├── tests/          # Unit and integration tests
 │       └── Dockerfile      # Optimized multi-stage build
 └── scripts/                # Helper scripts
+```
 
 ## Getting Started
 
@@ -182,6 +183,7 @@ sequenceDiagram
 - `kind` - Kubernetes in Docker
 - `kubectl` - Kubernetes CLI
 - `helm` - Package manager for Kubernetes
+- `kustomize` - Tool for customizing Kubernetes YAML configurations
 - `jq` - JSON processor
 
 ### Quick Start
