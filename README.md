@@ -31,7 +31,7 @@ flowchart TB
             DB[(SQLite DB)]
         end
         
-        subgraph NS2["Namespace: kserve-test"]
+        subgraph NS2["Namespace: aiq-detector"]
             ModelService[Model Service]
             
             subgraph ModelDeployment["KServe Deployment"]
@@ -44,19 +44,19 @@ flowchart TB
             end
         end
         
-        Gateway --> Service
-        Service --> Envoy1
-        Envoy1 --> FastAPI
-        FastAPI --> Storage
-        FastAPI --> DB
-        FastAPI --> ModelService
-        ModelService --> Knative
-        Knative --> ModelPod
-        Envoy2 --> Model
+        Gateway <--> Service
+        Service <--> Envoy1
+        Envoy1 <--> FastAPI
+        FastAPI <--> Storage
+        FastAPI <--> DB
+        FastAPI <--> ModelService
+        ModelService <--> Knative
+        Knative <--> ModelPod
+        Envoy2 <--> Model
     end
     
-    User --> Gateway
-    Gateway --> User
+    User <--> Gateway
+    Gateway <--> User
     
     style Gateway fill:#4285F4,color:#fff
     style FastAPI fill:#34A853,color:#fff
@@ -68,7 +68,7 @@ flowchart TB
 
 1. **User → Istio Gateway**: Client sends POST request to `/images/` endpoint
 2. **Gateway → Backend Service**: VirtualService routes request to backend service
-3. **Service → Pod**: Kubernetes service load balances to backend pod
+3. **Service → Pod**: Kubernetes service load balancer to backend pod
 4. **Envoy → FastAPI**: Sidecar proxy forwards request with mTLS
 5. **FastAPI Processing**:
    - Stores image in PVC-backed storage
@@ -239,7 +239,7 @@ For rapid development and testing without Kubernetes or Docker, you can run all 
 Run all services and tests with a single command:
 
 ```bash
-./run_all_local.sh
+./run_all.sh
 ```
 
 This script will:
@@ -403,3 +403,113 @@ cd services/backend
 5. Submit a pull request
 
 For detailed documentation on the local environment setup, see `environments/local/README.md`.
+
+## Quick Start
+
+### Running Everything Locally
+
+```bash
+# Run all services locally (model server + backend + tests)
+./run_all.sh
+
+# Or explicitly specify local mode
+./run_all.sh --mode local
+```
+
+### Running in Kubernetes (Kind)
+
+```bash
+# Set up complete K8s infrastructure and run services
+./run_all_k8s.sh
+
+# Clean up K8s infrastructure when done
+./run_all_k8s.sh --clean
+
+# Or use the parametrized script with Kind mode
+./run_all.sh --mode kind
+```
+
+## Scripts Overview
+
+### `run_all.sh`
+A unified script that can run services in two modes:
+- **Local mode** (default): Runs services as local processes
+- **Kind mode**: Uses existing Kubernetes infrastructure
+
+Usage:
+```bash
+./run_all.sh [--mode local|kind]
+```
+
+Features:
+- Starts model server and backend service
+- Runs integration tests
+- Performs model evaluation (if dataset is available)
+- Provides real-time logs and status
+- Automatic cleanup on exit
+
+### `run_all_k8s.sh`
+Sets up complete Kubernetes infrastructure using Kind and deploys all services.
+
+Usage:
+```bash
+# Deploy everything
+./run_all_k8s.sh
+
+# Clean up infrastructure
+./run_all_k8s.sh --clean
+```
+
+What it does:
+1. Creates a Kind cluster with proper configuration
+2. Installs KServe, Knative, Istio, and Cert-Manager
+3. Sets up ingress routing for Kind
+4. Builds and deploys the model server
+5. Builds and deploys the backend service
+6. Runs integration tests
+7. Performs model evaluation (optional)
+
+## Project Structure
+
+```
+kserve_ml_deployment/
+├── environments/
+│   └── local/
+│       ├── aiq_detector/        # Model server deployment
+│       ├── backend/             # Backend service deployment
+│       ├── setup_kind.sh        # Kind cluster setup
+│       ├── install_kserve_knative.sh  # KServe installation
+│       └── setup_ingress_routing.sh   # Ingress configuration
+├── services/
+│   ├── backend/                 # Backend service code
+│   └── evaluation/              # Model evaluation tools
+├── run_all.sh                  # Unified runner script
+└── run_all_k8s.sh              # K8s deployment script
+```
+
+## Requirements
+
+- Docker
+- Python 3.12+
+- uv (Python package manager)
+- For Kubernetes deployment:
+  - kind
+  - kubectl
+  - helm
+  - jq
+
+## Features
+
+- **Model Server**: Custom KServe-compatible inference service for circular object detection
+- **Backend Service**: FastAPI-based service for managing images and detections
+- **Integration Tests**: Comprehensive test suite for end-to-end validation
+- **Model Evaluation**: Performance metrics calculation (F1 score, Jaccard index)
+- **Multi-environment Support**: Run locally or in Kubernetes with the same interface
+
+## Development
+
+For detailed development instructions, see the individual README files in:
+- `environments/local/aiq_detector/README.md` - Model server details
+- `environments/local/backend/DEPLOYMENT.md` - Backend deployment guide
+- `services/backend/README.md` - Backend development guide
+- `services/evaluation/README.md` - Evaluation tools guide
