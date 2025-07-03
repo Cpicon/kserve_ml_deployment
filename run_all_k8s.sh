@@ -1,7 +1,11 @@
 #!/bin/bash
 # run_all_k8s.sh - Deploy and run all services in Kubernetes using Kind
 # This script sets up a Kind cluster, installs KServe/Knative, deploys services,
-# and runs integration tests
+# runs integration tests, and performs evaluation
+# Usage: ./run_all_k8s.sh [--clean] [--keep-running]
+# Options:
+#   --clean         Clean up existing infrastructure before starting
+#   --keep-running  Keep the infrastructure running after tests complete
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -35,15 +39,20 @@ cleanup() {
 
 # Parse arguments
 CLEAN_ONLY=false
+KEEP_RUNNING=false
 for arg in "$@"; do
     case $arg in
         --clean)
             CLEAN_ONLY=true
             shift
             ;;
+        --keep-running)
+            KEEP_RUNNING=true
+            shift
+            ;;
         *)
             echo "Unknown argument: $arg"
-            echo "Usage: $0 [--clean]"
+            echo "Usage: $0 [--clean] [--keep-running]"
             exit 1
             ;;
     esac
@@ -55,8 +64,10 @@ if [ "$CLEAN_ONLY" = true ]; then
     exit 0
 fi
 
-# Set up trap to cleanup on exit (only if not running tests)
-trap cleanup EXIT INT TERM
+# Set up trap to cleanup on exit (only if not keeping infrastructure running)
+if [ "$KEEP_RUNNING" = false ]; then
+    trap cleanup EXIT INT TERM
+fi
 
 # Print banner
 echo -e "${BOLD}${CYAN}================================================${NC}"
@@ -273,11 +284,18 @@ if [ $TEST_RESULT -eq 0 ]; then
     echo -e "  - Backend: kubectl port-forward -n aiq-backend svc/aiq-circular-detection 8080:80"
     echo -e "  - View logs: kubectl logs -f -n aiq-backend -l app=aiq-circular-detection"
     
-    echo -e "\n${YELLOW}Note: The cluster will be automatically cleaned up when this script exits.${NC}"
-    echo -e "${YELLOW}To keep the cluster running, press Ctrl+C now and run cleanup later with: $0 --clean${NC}"
-    
-    # Give user time to see the message
-    sleep 5
+    if [ "$KEEP_RUNNING" = true ]; then
+        echo -e "\n${GREEN}Infrastructure will remain running.${NC}"
+        echo -e "${YELLOW}To clean up later, run: $0 --clean${NC}"
+        echo -e "\n${BLUE}You can also use: ./run_all.sh --mode kind${NC}"
+        echo -e "${BLUE}This will reuse the existing infrastructure for testing.${NC}"
+    else
+        echo -e "\n${YELLOW}Note: The cluster will be automatically cleaned up when this script exits.${NC}"
+        echo -e "${YELLOW}To keep the cluster running, use: $0 --keep-running${NC}"
+        
+        # Give user time to see the message
+        sleep 5
+    fi
 else
     echo -e "${BOLD}${RED}❌ Tests failed!${NC}"
     echo -e "${YELLOW}Check the logs for more information:${NC}"
