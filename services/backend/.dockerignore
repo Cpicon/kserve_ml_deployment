@@ -1,0 +1,13 @@
+# virtual envs
+.venv
+# Python cache files
+__pycache__
+# Python bytecode files
+tests
+#environment variables
+.env
+env.example
+#dev files
+start-dev.sh
+# Docker files
+Dockerfile
