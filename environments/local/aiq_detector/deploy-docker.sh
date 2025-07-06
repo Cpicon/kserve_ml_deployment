@@ -10,14 +10,17 @@ if [ ! -f "model.py" ]; then
     exit 1
 fi
 
-# Build Docker image
+# Build Docker image with the correct tag
 echo "🔨 Building Docker image..."
-docker build -t aiq-detector:latest .
+docker build -t aiq-detector:v1 .
+
+# Tag for kind.local registry
+docker tag aiq-detector:v1 kind.local/aiq-detector:v1
 
 # Test the image locally
 echo "🧪 Testing image locally..."
 echo "Starting local container..."
-docker run -d --name aiq-detector-test -p 8080:8080 aiq-detector:latest
+docker run -d --name aiq-detector-test -p 8080:8080 aiq-detector:v1
 
 # Wait for the server to start
 echo "Waiting for server to start..."
@@ -41,7 +44,7 @@ docker rm aiq-detector-test
 
 # Load image into kind cluster
 echo "📦 Loading image into kind cluster..."
-kind load docker-image aiq-detector:latest --name kserve-deployment
+kind load docker-image kind.local/aiq-detector:v1 --name kserve-deployment
 
 # Create namespace if it doesn't exist
 echo "📁 Creating namespace..."
