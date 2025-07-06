@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: aiq-backend
+
+resources:
+- configmap.yaml
+- storage.yaml
+- deployment.yaml
+- istio-routing.yaml
+
+# Add labels to all resources
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: aiq-circular-detection
+    app.kubernetes.io/part-of: aiq-system
