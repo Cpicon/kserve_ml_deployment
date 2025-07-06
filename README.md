@@ -167,11 +167,15 @@ sequenceDiagram
 │       └── test/           # Demo model and test payloads
 ├── model/                  # Pretrained model artifacts
 ├── services/               # Microservices
-│   └── backend/            # FastAPI backend service
-│       ├── aiq_circular_detection/  # Main application package
-│       ├── config/         # Configuration management
-│       ├── tests/          # Unit and integration tests
-│       └── Dockerfile      # Optimized multi-stage build
+│   ├── backend/            # FastAPI backend service
+│   │   ├── aiq_circular_detection/  # Main application package
+│   │   ├── config/         # Configuration management
+│   │   ├── tests/          # Unit and integration tests
+│   │   └── Dockerfile      # Optimized multi-stage build
+│   └── evaluation/         # Model evaluation module
+│       ├── evaluate_model.py  # Evaluation script
+│       ├── requirements.txt   # Evaluation dependencies
+│       └── run_evaluation.sh  # Execution script
 └── scripts/                # Helper scripts
 ```
 
@@ -242,7 +246,9 @@ This script will:
 1. Start the AI model server on port 9090
 2. Start the backend API service on port 8000
 3. Run integration tests automatically
-4. Keep services running for manual testing
+4. Run model evaluation (if dataset is available)
+5. Display performance metrics summary
+6. Keep services running for manual testing
 
 The script handles:
 - Prerequisite checking
@@ -250,6 +256,12 @@ The script handles:
 - Service health monitoring
 - Automatic cleanup on exit
 - Detailed logging to `logs/` directory
+- Optional model evaluation with performance metrics
+
+To enable automatic model evaluation:
+1. Place your evaluation dataset in `services/evaluation/dataset/`
+2. Include `_annotations.coco.json` and image files
+3. The script will automatically run evaluation and display results
 
 #### Manual Local Testing
 
@@ -318,6 +330,49 @@ For production environments:
 5. **Enable monitoring** with Prometheus and distributed tracing
 
 See `environments/local/backend/DEPLOYMENT.md` for detailed deployment instructions.
+
+## Model Evaluation
+
+The project includes a comprehensive evaluation module to assess model performance on circular object detection tasks.
+
+### Evaluation Metrics
+
+The evaluation module uses industry-standard computer vision metrics:
+
+- **Jaccard Index (IoU)**: Measures overlap between predicted and ground truth regions
+  - Simple and weighted averages computed
+  - Range: 0 to 1 (higher is better)
+  
+- **F1 Score**: Balances precision and recall
+  - Precision: Ratio of correct detections to total detections
+  - Recall: Ratio of detected objects to total ground truth objects
+  - Uses IoU threshold of 0.5 for matching
+
+- **Hungarian Assignment**: Optimally matches predictions to ground truth objects
+
+### Running Evaluation
+
+1. **Prepare dataset** in COCO format:
+   ```bash
+   cd services/evaluation
+   mkdir -p dataset
+   # Copy COCO annotations and images
+   cp /path/to/_annotations.coco.json dataset/
+   cp /path/to/images/*.jpg dataset/
+   ```
+
+2. **Run evaluation**:
+   ```bash
+   cd services/evaluation
+   ./run_evaluation.sh
+   ```
+
+The evaluation generates:
+- Detailed metrics report (precision, recall, F1 score, Jaccard Index)
+- Annotated images showing predictions (red) vs ground truth (green)
+- Per-image performance breakdowns
+
+See `services/evaluation/README.md` for detailed documentation.
 
 ## Development
 
