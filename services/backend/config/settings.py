@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     # Model Service Configuration
     mode: Literal["real", "dummy"] = Field(
         default="dummy",
+        alias="MODE",
         description="Operation mode: 'real' for actual model inference, 'dummy' for mock responses"
     )
     model_server_url: Optional[str] = Field(

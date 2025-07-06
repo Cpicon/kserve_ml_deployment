@@ -95,6 +95,8 @@ def get_config() -> dict[str, Any]:
         "debug": settings.debug,
         "api_prefix": settings.api_prefix,
         "storage_type": settings.storage_type,
+        "mode": settings.mode,
+        "model_name": settings.model_name,
         "log_level": settings.log_level,
         "log_json": settings.log_json,
         "max_upload_size": settings.max_upload_size,

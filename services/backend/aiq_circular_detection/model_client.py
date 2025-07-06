@@ -81,10 +81,19 @@ class RealModelClient(ModelClient):
             image_bytes = image_file.read_bytes()
             
             # Prepare the request payload
-            # The payload should contain base64 encoded image and a label
+            # The model server expects either "instances" or "inputs" format
+            # Using the "instances" format which is TensorFlow V1 HTTP API format
             payload = {
-                "image": base64.b64encode(image_bytes).decode("utf-8"),
-                "label": "circular_objects"
+                "instances": [
+                    {
+                        "image": {
+                            "b64": base64.b64encode(image_bytes).decode("utf-8")
+                        }
+                    }
+                ],
+                "parameters": {
+                    "label": "coin"  # Default label for circular objects
+                }
             }
             
             # Construct the inference URL
@@ -105,8 +114,26 @@ class RealModelClient(ModelClient):
                 result = response.json()
                 
                 # Extract circles from the response
-                # Assuming the response format is a list of circle objects
-                circles = result.get("predictions", [])
+                # The response format should have predictions array
+                predictions = result.get("predictions", [])
+                
+                # Transform predictions to expected format
+                circles = []
+                for pred in predictions:
+                    circle = {
+                        "bbox": [
+                            pred["bounding_box"]["xmin"],
+                            pred["bounding_box"]["ymin"],
+                            pred["bounding_box"]["xmax"],
+                            pred["bounding_box"]["ymax"]
+                        ],
+                        "centroid": {
+                            "x": pred["centroid"]["x"],
+                            "y": pred["centroid"]["y"]
+                        },
+                        "radius": pred["radius"]["radius"]
+                    }
+                    circles.append(circle)
                 
                 # Log success
                 elapsed_time = time.time() - start_time
