@@ -247,8 +247,9 @@ if [ -d "${EVALUATION_DIR}/dataset" ] && [ -f "${EVALUATION_DIR}/dataset/_annota
         
         # Extract F1 Score results
         if grep -A 10 "F1 SCORE RESULTS" "${EVALUATION_LOG}" > /dev/null; then
-            echo -e "${GREEN}F1 Score Metrics:${NC}"
-            grep -E "IoU Threshold:|True Positives|False Positives|False Negatives|Precision:|Recall:|F1 Score:" "${EVALUATION_LOG}" | tail -7 | sed 's/^/  /'
+            echo -e "${GREEN}F1 Score Metrics (Multiple IoU Thresholds):${NC}"
+            # Extract the header, separator line, and data rows from the new table format
+            grep -A 10 "F1 SCORE RESULTS" "${EVALUATION_LOG}" | grep -E "^IoU|^---|^[0-9]\." | sed 's/^/  /'
         fi
         
         # Extract Jaccard Index results
