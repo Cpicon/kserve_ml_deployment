@@ -1,11 +1,14 @@
 import logging
+import uuid
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import get_settings
+from aiq_circular_detection.schemas import ImageUploadResponse
+from aiq_circular_detection.storage.local import LocalStorageClient
 
 # Get settings and configure logging before anything else
 settings = get_settings()
@@ -13,6 +16,12 @@ settings.configure_logging()
 
 # Create logger for this module
 logger = logging.getLogger(__name__)
+
+# Initialize storage client
+storage_client = LocalStorageClient()
+
+# In-memory mapping from image_id to file path (placeholder for now)
+image_id_to_path: dict[str, str] = {}
 
 
 @asynccontextmanager
@@ -75,4 +84,43 @@ def get_config() -> dict[str, Any]:
         "log_level": settings.log_level,
         "log_json": settings.log_json,
         "max_upload_size": settings.max_upload_size,
-    } 
+    }
+
+
+@app.post("/images/", response_model=ImageUploadResponse)
+async def upload_image(file: UploadFile) -> ImageUploadResponse:
+    """Upload an image file.
+    
+    Args:
+        file: The uploaded image file.
+        
+    Returns:
+        ImageUploadResponse: Response containing the unique image ID.
+        
+    Raises:
+        HTTPException: If the file is empty or cannot be saved.
+    """
+    # Read the file content
+    content = await file.read()
+    
+    # Check if file is empty
+    if not content:
+        raise HTTPException(status_code=400, detail="File cannot be empty")
+    
+    try:
+        # Save the image using storage client
+        file_path = storage_client.save_image(content)
+        
+        # Generate unique image ID
+        image_id = uuid.uuid4()
+        
+        # Store mapping in memory (placeholder for now)
+        image_id_to_path[str(image_id)] = file_path
+        
+        logger.info(f"Uploaded image: {image_id} -> {file_path}")
+        
+        # Return response with image ID
+        return ImageUploadResponse(image_id=image_id)
+    except Exception as e:
+        logger.error(f"Failed to upload image: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to save image: {str(e)}") 
