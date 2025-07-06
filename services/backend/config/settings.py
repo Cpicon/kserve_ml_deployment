@@ -47,14 +47,20 @@ class Settings(BaseSettings):
         description="Allowed CORS origins"
     )
     
-    # Storage Configuration
+    # Storage Configuration (for image files)
     storage_type: Literal["local", "s3", "azure"] = Field(
         default="local",
-        description="Storage backend type"
+        description="Storage backend type for image files"
     )
     storage_root: Path = Field(
         default=Path("data/images"),
         description="Root directory for local storage"
+    )
+    
+    # Metadata Storage Configuration
+    metadata_storage: Literal["memory", "database"] = Field(
+        default="memory",
+        description="Storage backend for image metadata (ID to path mapping)"
     )
     
     @field_validator("storage_root", mode="before")
@@ -65,7 +71,7 @@ class Settings(BaseSettings):
             return Path(v)
         return v
     
-    # Database Configuration (for future use)
+    # Database Configuration (for metadata and future use)
     database_url: str = Field(
         default="sqlite:///data/db.sqlite3",
         description="Database connection URL"
