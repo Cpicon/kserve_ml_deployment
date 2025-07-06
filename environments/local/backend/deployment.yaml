@@ -66,11 +66,11 @@ spec:
         
         # Model settings (could also be in ConfigMap)
         - name: MODE
-          value: "dummy"  # Change to "real" if model is deployed
+          value: "real"  # Use real mode to connect to the model server
         - name: MODEL_SERVER_URL
-          value: "http://circular-detector-predictor-default.default.svc.cluster.local/v1/models/circular-detector:predict"
+          value: "http://aiq-detector-predictor.aiq-model-serving.svc.cluster.local:80"
         - name: MODEL_NAME
-          value: "circular-detector"
+          value: "aiq-detector"
         
         # Resources (adjusted for local development)
         resources:

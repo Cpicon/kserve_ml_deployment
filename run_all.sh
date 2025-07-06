@@ -20,6 +20,8 @@ PROJECT_ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 LOG_DIR="${PROJECT_ROOT}/logs"
 MODEL_LOG="${LOG_DIR}/model_server.log"
 BACKEND_LOG="${LOG_DIR}/backend_server.log"
+CLUSTER_NAME="kserve-deployment"
+INFRASTRUCTURE_LOG="${LOG_DIR}/infrastructure_setup.log"
 
 # PIDs for cleanup
 MODEL_PID=""
@@ -48,6 +50,93 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Function to setup infrastructure for Kind mode
+setup_kind_infrastructure() {
+    echo -e "${BOLD}${BLUE}Setting up Kind infrastructure...${NC}"
+    echo -e "${BLUE}=================================${NC}"
+    echo -e "${YELLOW}This is a one-time setup that will take several minutes...${NC}"
+    echo -e "${YELLOW}Log file: $INFRASTRUCTURE_LOG${NC}"
+    
+    cd "${PROJECT_ROOT}/environments/local" || exit 1
+    
+    # Step 1: Create Kind cluster
+    echo -e "\n${BLUE}1. Creating Kind cluster...${NC}"
+    if ./setup_kind.sh 2>&1 | tee "$INFRASTRUCTURE_LOG"; then
+        echo -e "${GREEN}✅ Kind cluster created${NC}"
+    else
+        echo -e "${RED}❌ Failed to create Kind cluster${NC}"
+        return 1
+    fi
+    
+    # Step 2: Install KServe and dependencies
+    echo -e "\n${BLUE}2. Installing KServe and dependencies...${NC}"
+    echo -e "${YELLOW}This may take 5-10 minutes...${NC}"
+    if ./install_kserve_knative.sh 2>&1 | tee -a "$INFRASTRUCTURE_LOG"; then
+        echo -e "${GREEN}✅ KServe installed${NC}"
+    else
+        echo -e "${RED}❌ Failed to install KServe${NC}"
+        return 1
+    fi
+    
+    # Step 3: Setup ingress routing
+    echo -e "\n${BLUE}3. Setting up ingress routing...${NC}"
+    if ./setup_ingress_routing.sh ${CLUSTER_NAME} 2>&1 | tee -a "$INFRASTRUCTURE_LOG"; then
+        echo -e "${GREEN}✅ Ingress routing configured${NC}"
+    else
+        echo -e "${RED}❌ Failed to setup ingress routing${NC}"
+        return 1
+    fi
+    
+    # Step 4: Deploy model server
+    echo -e "\n${BLUE}4. Deploying model server to Kubernetes...${NC}"
+    cd "${PROJECT_ROOT}/environments/local/aiq_detector" || exit 1
+    if ./deploy-docker.sh 2>&1 | tee -a "$INFRASTRUCTURE_LOG"; then
+        echo -e "${GREEN}✅ Model server deployed${NC}"
+    else
+        echo -e "${RED}❌ Failed to deploy model server${NC}"
+        return 1
+    fi
+    
+    # Step 5: Deploy backend service
+    echo -e "\n${BLUE}5. Deploying backend service to Kubernetes...${NC}"
+    cd "${PROJECT_ROOT}/environments/local/backend" || exit 1
+    if ./deploy.sh 2>&1 | tee -a "$INFRASTRUCTURE_LOG"; then
+        echo -e "${GREEN}✅ Backend service deployed${NC}"
+    else
+        echo -e "${RED}❌ Failed to deploy backend service${NC}"
+        return 1
+    fi
+    
+    cd "${PROJECT_ROOT}" || exit 1
+    echo -e "\n${GREEN}✅ Infrastructure setup complete!${NC}"
+    return 0
+}
+
+# Function to check if Kind infrastructure is ready
+check_kind_infrastructure() {
+    # Check if cluster exists
+    if ! kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
+        return 1
+    fi
+    
+    # Check if KServe is installed
+    if ! kubectl get namespace kserve &>/dev/null; then
+        return 1
+    fi
+    
+    # Check if model is deployed
+    if ! kubectl get inferenceservice aiq-detector -n aiq-model-serving &>/dev/null; then
+        return 1
+    fi
+    
+    # Check if backend is deployed
+    if ! kubectl get deployment aiq-circular-detection -n aiq-backend &>/dev/null; then
+        return 1
+    fi
+    
+    return 0
+}
 
 # Cleanup function
 cleanup() {
@@ -168,11 +257,30 @@ if [[ "$RUN_MODE" == "kind" ]]; then
         exit 1
     fi
     
-    # Check if cluster exists
-    if ! kind get clusters 2>/dev/null | grep -q "^kserve-deployment$"; then
-        echo -e "${RED}❌ Kind cluster 'kserve-deployment' not found${NC}"
-        echo -e "${YELLOW}Please run: ./run_all_k8s.sh first to set up the infrastructure${NC}"
-        exit 1
+    # Check if infrastructure is ready
+    if ! check_kind_infrastructure; then
+        echo -e "${YELLOW}⚠️  Kind infrastructure not found or incomplete${NC}"
+        echo -e "${BLUE}Would you like to set it up now? This will:${NC}"
+        echo -e "  - Create a Kind cluster"
+        echo -e "  - Install KServe and dependencies"
+        echo -e "  - Deploy the model and backend services"
+        echo -e "${YELLOW}This is a one-time setup that takes 5-10 minutes.${NC}"
+        
+        read -p "Continue with setup? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            if setup_kind_infrastructure; then
+                echo -e "${GREEN}✅ Infrastructure is now ready!${NC}"
+            else
+                echo -e "${RED}❌ Infrastructure setup failed. Check log: $INFRASTRUCTURE_LOG${NC}"
+                exit 1
+            fi
+        else
+            echo -e "${YELLOW}Setup cancelled. You can run './run_all_k8s.sh' manually to set up infrastructure.${NC}"
+            exit 0
+        fi
+    else
+        echo -e "${GREEN}✅ Kind infrastructure is ready${NC}"
     fi
 else
     # Check if ports are available for local mode
@@ -202,12 +310,13 @@ if [[ "$RUN_MODE" == "local" ]]; then
 
     # Start model server in background
     echo -e "${BLUE}Starting model server on port $MODEL_PORT...${NC}"
-    echo -e "${YELLOW}Logs will be shown below and saved to: $MODEL_LOG${NC}"
-    echo -e "${CYAN}=================== MODEL SERVER LOGS ===================${NC}"
+    echo -e "${YELLOW}Setup logs will be shown below and saved to: $MODEL_LOG${NC}"
+    echo -e "${YELLOW}Server logs are suppressed for cleaner output${NC}"
+    echo -e "${CYAN}=================== MODEL SERVER SETUP ===================${NC}"
 
     # Run in a subshell to capture the PID properly
     (
-        ./run_local.sh 2>&1 | tee "$MODEL_LOG"
+        ./run_local.sh --quiet 2>&1 | tee "$MODEL_LOG"
     ) &
     MODEL_PID=$!
 
@@ -241,14 +350,15 @@ if [[ "$RUN_MODE" == "local" ]]; then
 
     # Start backend service in background
     echo -e "${BLUE}Starting backend service on port $BACKEND_PORT...${NC}"
-    echo -e "${YELLOW}Logs will be shown below and saved to: $BACKEND_LOG${NC}"
+    echo -e "${YELLOW}Setup logs will be shown below and saved to: $BACKEND_LOG${NC}"
+    echo -e "${YELLOW}Server logs are suppressed for cleaner output${NC}"
     echo -e "${YELLOW}Environment: MODE=$MODE, MODEL_SERVER_URL=$MODEL_SERVER_URL${NC}"
-    echo -e "${CYAN}=================== BACKEND SERVICE LOGS ===================${NC}"
+    echo -e "${CYAN}================== BACKEND SERVICE SETUP ==================${NC}"
 
     # Run in a subshell to capture the PID properly
     (
         # Source the script to ensure environment variables are passed
-        bash -c "export MODE=$MODE && export MODEL_SERVER_URL=$MODEL_SERVER_URL && export MODEL_NAME=$MODEL_NAME && export METADATA_STORAGE=$METADATA_STORAGE && export LOG_LEVEL=$LOG_LEVEL && export MODEL_SERVICE_TIMEOUT=$MODEL_SERVICE_TIMEOUT && ./start-dev-real.sh" 2>&1 | tee "$BACKEND_LOG"
+        bash -c "export MODE=$MODE && export MODEL_SERVER_URL=$MODEL_SERVER_URL && export MODEL_NAME=$MODEL_NAME && export METADATA_STORAGE=$METADATA_STORAGE && export LOG_LEVEL=$LOG_LEVEL && export MODEL_SERVICE_TIMEOUT=$MODEL_SERVICE_TIMEOUT && ./start-dev.sh --quiet" 2>&1 | tee "$BACKEND_LOG"
     ) &
     BACKEND_PID=$!
 
@@ -328,8 +438,8 @@ if [ $TEST_RESULT -ne 0 ]; then
     echo -e "${RED}❌ Tests failed!${NC}"
     echo -e "${YELLOW}Check the logs for more information:${NC}"
     if [[ "$RUN_MODE" == "local" ]]; then
-        echo -e "  - Model server log: ${MODEL_LOG}"
-        echo -e "  - Backend service log: ${BACKEND_LOG}"
+        echo -e "  - Model server setup log: ${MODEL_LOG}"
+        echo -e "  - Backend service setup log: ${BACKEND_LOG}"
     else
         echo -e "  - Model logs: kubectl logs -n aiq-model-serving -l serving.kserve.io/inferenceservice=aiq-detector"
         echo -e "  - Backend logs: kubectl logs -n aiq-backend -l app=aiq-circular-detection"
@@ -417,13 +527,13 @@ if [ $TEST_RESULT -eq 0 ]; then
         echo -e "  - URL: http://localhost:$MODEL_PORT"
         echo -e "  - Swagger UI: http://localhost:$MODEL_PORT/docs"
         echo -e "  - PID: $MODEL_PID"
-        echo -e "  - Log: $MODEL_LOG"
+        echo -e "  - Setup Log: $MODEL_LOG"
         echo ""
         echo -e "${GREEN}Backend Service:${NC}"
         echo -e "  - URL: http://localhost:$BACKEND_PORT"
         echo -e "  - API Docs: http://localhost:$BACKEND_PORT/docs"
         echo -e "  - PID: $BACKEND_PID"
-        echo -e "  - Log: $BACKEND_LOG"
+        echo -e "  - Setup Log: $BACKEND_LOG"
     else
         echo -e "${GREEN}Model Server (K8s):${NC}"
         echo -e "  - URL: http://localhost:$MODEL_PORT (via port-forward)"
@@ -453,7 +563,7 @@ if [ $TEST_RESULT -eq 0 ]; then
     echo -e "  - Test the API at http://localhost:$BACKEND_PORT/docs"
     echo -e "  - View model server at http://localhost:$MODEL_PORT/docs"
     if [[ "$RUN_MODE" == "local" ]]; then
-        echo -e "  - Check logs in the $LOG_DIR directory"
+        echo -e "  - Check setup logs in the $LOG_DIR directory"
     else
         echo -e "  - View K8s resources: kubectl get all -n aiq-model-serving"
         echo -e "  - View K8s resources: kubectl get all -n aiq-backend"
@@ -471,8 +581,8 @@ else
     echo -e "${BOLD}${RED}❌ Tests failed!${NC}"
     echo -e "${YELLOW}Check the logs for more information:${NC}"
     if [[ "$RUN_MODE" == "local" ]]; then
-        echo -e "  - Model server log: $MODEL_LOG"
-        echo -e "  - Backend service log: $BACKEND_LOG"
+        echo -e "  - Model server setup log: $MODEL_LOG"
+        echo -e "  - Backend service setup log: $BACKEND_LOG"
     else
         echo -e "  - Model logs: kubectl logs -n aiq-model-serving -l serving.kserve.io/inferenceservice=aiq-detector"
         echo -e "  - Backend logs: kubectl logs -n aiq-backend -l app=aiq-circular-detection"

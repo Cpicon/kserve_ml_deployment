@@ -208,17 +208,12 @@ sequenceDiagram
 
 ### Quick Start
 
-### Local Development Testing (No Kubernetes/Docker)
+#### Option 1: Local Development (No Kubernetes)
 
-For rapid development and testing without Kubernetes or Docker, you can run all services locally on your machine.
-
-#### Running Everything Locally
+For rapid development and testing without Kubernetes or Docker, run all services locally on your machine:
 
 ```bash
 # Run all services locally (model server + backend + tests)
-./run_all.sh
-
-# Or explicitly specify local mode
 ./run_all.sh --mode local
 ```
 
@@ -230,19 +225,27 @@ This script will:
 5. Display performance metrics summary
 6. Keep services running for manual testing
 
-#### Running in Kubernetes (Kind)
+#### Option 2: Kubernetes Development (Kind)
+
+For testing in a real Kubernetes environment:
 
 ```bash
-# Set up complete K8s infrastructure and run services
-./run_all_k8s.sh
+# First time or full infrastructure test (deploys everything and runs tests)
+./run_all_k8s.sh --keep-running  # Keeps infrastructure running after tests
 
-# Clean up K8s infrastructure when done
+# Subsequent test runs (reuses existing infrastructure)
+./run_all.sh --mode kind          # Auto-detects and sets up infrastructure if needed
+
+# Clean up when done
 ./run_all_k8s.sh --clean
-
-# Or use the parametrized script with Kind mode
-./run_all.sh --mode kind
 ```
-What it does:
+
+**Key Features:**
+- `./run_all.sh --mode kind` automatically sets up infrastructure if it doesn't exist
+- `./run_all_k8s.sh --keep-running` prevents automatic cleanup after tests
+- Infrastructure persists between test runs for faster iteration
+
+**What happens during setup:**
 1. Creates a Kind cluster with proper configuration
 2. Installs KServe, Knative, Istio, and Cert-Manager
 3. Sets up ingress routing for Kind
@@ -251,34 +254,7 @@ What it does:
 6. Runs integration tests
 7. Performs model evaluation (optional)
 
-## Scripts Overview
-
-### `run_all.sh`
-A unified script that can run services in two modes:
-- **Local mode** (default): Runs services as local processes
-- **Kind mode**: Uses existing Kubernetes infrastructure
-
-Usage:
-```bash
-./run_all.sh [--mode local|kind]
-```
-
-Features:
-- Starts model server and backend service
-- Runs integration tests
-- Performs model evaluation (if dataset is available)
-- Provides real-time logs and status
-- Automatic cleanup on exit
-
-The script handles:
-- Prerequisite checking
-- Port availability verification
-- Service health monitoring
-- Automatic cleanup on exit
-- Detailed logging to `logs/` directory
-- Optional model evaluation with performance metrics
-
-To enable automatic model evaluation:
+#### To enable automatic model evaluation:
 1. Place your evaluation dataset in `services/evaluation/dataset/`
 2. Include `_annotations.coco.json` and image files
 3. The script will automatically run evaluation and display results

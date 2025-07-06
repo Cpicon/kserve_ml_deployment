@@ -119,7 +119,3 @@ echo -e "${BLUE}===================================${NC}"
 echo -e "Image ID: ${IMAGE_ID}"
 echo -e "Objects detected: ${OBJECT_COUNT}"
 echo -e "Backend mode: ${MODE}"
-
-# Cleanup option
-echo -e "${YELLOW}\nTo delete this test image, run:${NC}"
-echo -e "curl -X DELETE ${API_URL}/images/${IMAGE_ID}" 
