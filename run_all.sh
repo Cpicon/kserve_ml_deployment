@@ -202,11 +202,12 @@ if [[ "$RUN_MODE" == "local" ]]; then
 
     # Start model server in background
     echo -e "${BLUE}Starting model server on port $MODEL_PORT...${NC}"
-    echo -e "${YELLOW}Log file: $MODEL_LOG${NC}"
+    echo -e "${YELLOW}Logs will be shown below and saved to: $MODEL_LOG${NC}"
+    echo -e "${CYAN}=================== MODEL SERVER LOGS ===================${NC}"
 
     # Run in a subshell to capture the PID properly
     (
-        ./run_local.sh > "$MODEL_LOG" 2>&1
+        ./run_local.sh 2>&1 | tee "$MODEL_LOG"
     ) &
     MODEL_PID=$!
 
@@ -240,13 +241,14 @@ if [[ "$RUN_MODE" == "local" ]]; then
 
     # Start backend service in background
     echo -e "${BLUE}Starting backend service on port $BACKEND_PORT...${NC}"
-    echo -e "${YELLOW}Log file: $BACKEND_LOG${NC}"
+    echo -e "${YELLOW}Logs will be shown below and saved to: $BACKEND_LOG${NC}"
     echo -e "${YELLOW}Environment: MODE=$MODE, MODEL_SERVER_URL=$MODEL_SERVER_URL${NC}"
+    echo -e "${CYAN}=================== BACKEND SERVICE LOGS ===================${NC}"
 
     # Run in a subshell to capture the PID properly
     (
         # Source the script to ensure environment variables are passed
-        bash -c "export MODE=$MODE && export MODEL_SERVER_URL=$MODEL_SERVER_URL && export MODEL_NAME=$MODEL_NAME && export METADATA_STORAGE=$METADATA_STORAGE && export LOG_LEVEL=$LOG_LEVEL && export MODEL_SERVICE_TIMEOUT=$MODEL_SERVICE_TIMEOUT && ./start-dev-real.sh" > "$BACKEND_LOG" 2>&1
+        bash -c "export MODE=$MODE && export MODEL_SERVER_URL=$MODEL_SERVER_URL && export MODEL_NAME=$MODEL_NAME && export METADATA_STORAGE=$METADATA_STORAGE && export LOG_LEVEL=$LOG_LEVEL && export MODEL_SERVICE_TIMEOUT=$MODEL_SERVICE_TIMEOUT && ./start-dev-real.sh" 2>&1 | tee "$BACKEND_LOG"
     ) &
     BACKEND_PID=$!
 
