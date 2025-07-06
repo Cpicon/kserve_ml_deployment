@@ -1,0 +1,26 @@
+apiVersion: "serving.kserve.io/v1beta1"
+kind: "InferenceService"
+metadata:
+  name: "aiq-detector"
+  namespace: "aiq-model-serving"
+spec:
+  predictor:
+    containers:
+    - name: kserve-container
+      image: kind.local/aiq-detector:v1
+      imagePullPolicy: Never
+      command: ["python"]
+      args:
+        - "model.py"
+        - "--model_name=aiq-detector"
+        - "--enable_docs_url=true"
+      ports:
+        - containerPort: 8080
+          protocol: TCP
+      resources:
+        requests:
+          cpu: "1"
+          memory: "4Gi"
+        limits:
+          cpu: "2"
+          memory: "8Gi" 

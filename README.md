@@ -185,6 +185,7 @@ sequenceDiagram
 - `helm` - Package manager for Kubernetes
 - `kustomize` - Tool for customizing Kubernetes YAML configurations
 - `jq` - JSON processor
+- `pack` - Pack is a CLI tool maintained by the CNB project to support the use of buildpacks (https://buildpacks.io/docs/for-platform-operators/how-to/integrate-ci/pack/)
 
 ### Quick Start
 
