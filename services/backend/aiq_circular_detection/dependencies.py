@@ -1,13 +1,19 @@
 """FastAPI dependency injection configuration."""
 
 import logging
-from functools import lru_cache
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from aiq_circular_detection.db import get_db
-from aiq_circular_detection.repositories import ImageRepository, InMemoryImageRepository, ImageDBRepository
+from aiq_circular_detection.repositories import (
+    ImageDBRepository,
+    ImageRepository,
+    InMemoryImageRepository,
+)
+from aiq_circular_detection.repositories.object_db import CircularObjectDBRepository
+from aiq_circular_detection.storage.base import StorageClient
+from aiq_circular_detection.storage.local import LocalStorageClient
 from config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -15,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 # Global instance for in-memory repository
 _in_memory_repository: InMemoryImageRepository | None = None
+
+# Global instance for storage client
+_storage_client: StorageClient | None = None
 
 
 def get_image_repository(db: Session = Depends(get_db)) -> ImageRepository:
@@ -46,4 +55,45 @@ def get_image_repository(db: Session = Depends(get_db)) -> ImageRepository:
         if _in_memory_repository is None:
             _in_memory_repository = InMemoryImageRepository()
             logger.info(f"Created in-memory repository for image metadata (metadata_storage={settings.metadata_storage})")
-        return _in_memory_repository 
+        return _in_memory_repository
+
+
+def get_object_db_repository(db: Session = Depends(get_db)) -> CircularObjectDBRepository:
+    """Get a CircularObjectDBRepository instance.
+    
+    Args:
+        db: Database session from get_db dependency
+        
+    Returns:
+        CircularObjectDBRepository: Repository for circular object operations
+    """
+    return CircularObjectDBRepository(db)
+
+
+def get_storage_client() -> StorageClient:
+    """Get the appropriate storage client based on configuration.
+    
+    This function returns the correct storage implementation based on
+    the STORAGE_TYPE environment variable:
+    - "local": Uses LocalStorageClient (stores files on local filesystem)
+    - Future: Could support "s3", "azure", etc.
+    
+    Returns:
+        StorageClient: The configured storage client instance
+    """
+    global _storage_client
+    
+    if _storage_client is None:
+        settings = get_settings()
+        
+        # For now, we only support local storage
+        # In the future, this could be extended to support other storage types
+        if settings.storage_type == "local":
+            _storage_client = LocalStorageClient()
+            logger.info(f"Created local storage client with root: {settings.storage_root}")
+        else:
+            # Default to local storage for unknown types
+            logger.warning(f"Unknown storage type: {settings.storage_type}, defaulting to local")
+            _storage_client = LocalStorageClient()
+    
+    return _storage_client 

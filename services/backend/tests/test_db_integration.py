@@ -4,8 +4,6 @@ import os
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from config import get_settings
 
 
@@ -74,6 +72,7 @@ def test_sqlite_data_directory_creation():
             
             # Import database module which should create the directory
             import importlib
+
             import aiq_circular_detection.db.database as db_module
             importlib.reload(db_module)
             

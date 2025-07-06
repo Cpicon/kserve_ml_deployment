@@ -7,6 +7,7 @@ from .detection import (
     DetectionResponse,
 )
 from .image import ImageUploadResponse
+from .object import ObjectListSummaryResponse, ObjectSummary
 
 __all__ = [
     "ImageUploadResponse",
@@ -14,4 +15,6 @@ __all__ = [
     "CircularObjectResponse",
     "DetectionRequest",
     "DetectionResponse",
+    "ObjectSummary",
+    "ObjectListSummaryResponse",
 ] 

@@ -2,30 +2,36 @@
 import hashlib
 import io
 from pathlib import Path
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from aiq_circular_detection.dependencies import get_image_repository
+from aiq_circular_detection.dependencies import get_image_repository, get_storage_client
 from aiq_circular_detection.main import app
 from aiq_circular_detection.repositories import InMemoryImageRepository
 from aiq_circular_detection.storage.local import LocalStorageClient
-from config import get_settings
 
 
 # Override the dependency to always use in-memory repository for tests
-@pytest.fixture(scope="module")
+@pytest.fixture
 def test_repository():
-    """Create a test repository that persists across all tests in this module."""
+    """Create a test repository that is fresh for each test."""
     return InMemoryImageRepository()
 
 
+@pytest.fixture
+def test_storage_client():
+    """Create a test storage client that is fresh for each test."""
+    return LocalStorageClient()
+
+
 @pytest.fixture(autouse=True)
-def setup_test_app(test_repository):
-    """Override the repository dependency for tests."""
+def setup_test_app(test_repository, test_storage_client):
+    """Override the repository and storage client dependencies for tests."""
     app.dependency_overrides[get_image_repository] = lambda: test_repository
+    app.dependency_overrides[get_storage_client] = lambda: test_storage_client
     # Clear repository before each test
     if hasattr(test_repository, 'clear'):
         test_repository.clear()
@@ -280,7 +286,10 @@ def test_optimization_check_before_save():
         test_repository.add_image(test_image, "fake/path.jpg")
         
         # Mock storage client to ensure it's not called
-        with patch('aiq_circular_detection.main.storage_client') as mock_storage:
+        mock_storage = Mock()
+        app.dependency_overrides[get_storage_client] = lambda: mock_storage
+        
+        try:
             # Upload the same image
             response = client.post(
                 "/images/",
@@ -293,5 +302,8 @@ def test_optimization_check_before_save():
             
             # Verify storage client was never called
             mock_storage.save_image.assert_not_called()
+        finally:
+            # Clean up the override
+            pass
     finally:
         app.dependency_overrides.clear() 

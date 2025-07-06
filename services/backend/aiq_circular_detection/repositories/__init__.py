@@ -1,6 +1,6 @@
 """Repository implementations for data access."""
 
-from .image import ImageRepository, InMemoryImageRepository, ImageDBRepository
+from .image import ImageDBRepository, ImageRepository, InMemoryImageRepository
 from .object_db import CircularObjectDBRepository
 
 __all__ = [
