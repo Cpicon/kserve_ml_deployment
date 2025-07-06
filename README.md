@@ -170,16 +170,12 @@ sequenceDiagram
 │       ├── setup_ingress_routing.sh   # Ingress configuration
 │       ├── setup_kind.sh   # Kind cluster setup
 │       └── README.md       # Local environment documentation
-├── data/                   # Data directory
-├── logs/                   # Application logs
-├── model/                  # Pretrained model artifacts
 ├── services/               # Microservices
 │   ├── backend/            # FastAPI backend service
 │   │   ├── aiq_circular_detection/  # Main application package
 │   │   ├── config/         # Configuration management
 │   │   ├── tests/          # Unit and integration tests
 │   │   ├── data/           # Backend data storage
-│   │   ├── logs/           # Backend service logs
 │   │   ├── Dockerfile      # Optimized multi-stage build
 │   │   ├── docker-compose.yml  # Docker Compose configuration
 │   │   ├── pyproject.toml  # Python project configuration
@@ -194,7 +190,6 @@ sequenceDiagram
 │   │   ├── requirements.txt   # Evaluation dependencies
 │   │   ├── run_evaluation.sh  # Execution script
 │   │   └── README.md       # Evaluation documentation
-│   └── spec.md             # Service specifications
 ├── run_all.sh              # Unified runner script (local/kind modes)
 ├── run_all_k8s.sh          # Kubernetes deployment script
 └── README.md               # This file
