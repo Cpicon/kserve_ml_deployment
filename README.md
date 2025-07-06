@@ -13,94 +13,66 @@ The goal is to give you an opinionated, yet extensible starting point that you c
 The following diagram illustrates the complete request flow when a user uploads an image for circular object detection:
 
 ```mermaid
-graph TB
-    subgraph "External"
-        User[User/Client]
+flowchart TB
+    User[User/Client] -->|1. POST /images/| Gateway[Istio Gateway :80/:443]
+    Gateway -->|2. Routes via VirtualService| Service[Backend Service]
+    
+    subgraph Backend["Backend Pod (FastAPI + Envoy)"]
+        Service --> Envoy1[Envoy Proxy]
+        Envoy1 --> FastAPI[FastAPI :8000]
+        FastAPI --> Storage[(Storage)]
+        FastAPI --> DB[(Database)]
     end
     
-    subgraph "Kubernetes Cluster"
-        subgraph "Istio Ingress Layer"
-            IG[Istio Gateway<br/>:80/:443]
-            VS[VirtualService<br/>Routes: /api/v1/*, /health, /docs]
-        end
-        
-        subgraph "Backend Service Pod"
-            subgraph "Istio Service Mesh"
-                EP1[Envoy Proxy<br/>Sidecar]
-            end
-            subgraph "Application Container"
-                FA[FastAPI Backend<br/>:8000]
-                API[POST /images/<br/>Endpoint]
-            end
-        end
-        
-        subgraph "Storage & Database"
-            PV[PersistentVolume<br/>hostPath/EBS/GCE]
-            DB[(SQLite/PostgreSQL<br/>Metadata & Objects)]
-            FS[File Storage<br/>Images]
-        end
-        
-        subgraph "KServe Model Service"
-            subgraph "Knative Serving"
-                KPA[Knative Autoscaler<br/>Scale 0→N]
-                REV[Revision<br/>sklearn-iris-predictor]
-            end
-            
-            subgraph "Model Pod (On-Demand)"
-                subgraph "Istio Mesh"
-                    EP2[Envoy Proxy]
-                end
-                subgraph "Model Container"
-                    MS[Model Server<br/>:8080]
-                    ML[PyTorch/TF Model<br/>Circle Detection]
-                end
-            end
-        end
+    FastAPI -->|3. Inference Request| ModelService[Model Service]
+    
+    subgraph KServe["KServe Model Service"]
+        ModelService --> Knative[Knative Autoscaler]
+        Knative -->|4. Scale 0→1| ModelPod[Model Pod]
+        ModelPod --> Envoy2[Envoy Proxy]
+        Envoy2 --> Model[Model Server :8080]
     end
     
-    %% Request Flow
-    User -->|1. POST /images/<br/>multipart/form-data| IG
-    IG -->|2. Route via<br/>HTTP rules| VS
-    VS -->|3. Forward to<br/>backend service| EP1
-    EP1 -->|4. mTLS| FA
-    FA --> API
+    Model -->|5. Detection Results| FastAPI
+    FastAPI -->|6. Response| User
     
-    %% Backend Processing
-    API -->|5. Store image| FS
-    API -->|6. Save metadata| DB
-    API -->|7. Request inference<br/>base64 image| EP1
+    style Gateway fill:#4285F4,color:#fff
+    style FastAPI fill:#34A853,color:#fff
+    style Model fill:#FBBC04,color:#000
+    style Knative fill:#EA4335,color:#fff
+```
+
+### Detailed Request Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant IG as Istio Gateway
+    participant VS as VirtualService
+    participant EP as Envoy Proxy
+    participant API as FastAPI Backend
+    participant S as Storage (PVC)
+    participant DB as Database
+    participant KS as KServe
+    participant M as Model Server
     
-    %% Model Inference Flow
-    EP1 -->|8. Service discovery<br/>via Istio| KPA
-    KPA -->|9. Scale from 0<br/>if needed| REV
-    REV -->|10. Create pod| EP2
-    EP2 -->|11. Forward| MS
-    MS --> ML
-    ML -->|12. Detect circles<br/>bbox + scores| MS
-    
-    %% Response Flow
-    MS -->|13. JSON response| EP2
-    EP2 -->|14. Return via mesh| EP1
-    EP1 --> API
-    API -->|15. Save detections| DB
-    API -->|16. Response| FA
-    FA --> EP1
-    EP1 --> VS
-    VS --> IG
-    IG -->|17. JSON result| User
-    
-    %% Styling
-    classDef istio fill:#4285F4,stroke:#1a73e8,color:white
-    classDef backend fill:#34A853,stroke:#188038,color:white
-    classDef storage fill:#EA4335,stroke:#C5221F,color:white
-    classDef kserve fill:#FBBC04,stroke:#F29900,color:black
-    classDef user fill:#673AB7,stroke:#512DA8,color:white
-    
-    class IG,VS,EP1,EP2 istio
-    class FA,API backend
-    class PV,DB,FS storage
-    class KPA,REV,MS,ML kserve
-    class User user
+    U->>IG: POST /images/ (image file)
+    IG->>VS: Route based on path
+    VS->>EP: Forward to backend service
+    EP->>API: mTLS secured request
+    API->>S: Store image file
+    API->>DB: Save image metadata
+    API->>KS: Request inference (base64 image)
+    Note over KS: Knative scales from 0 to 1
+    KS->>M: Forward to model pod
+    M->>M: Detect circles
+    M->>KS: Return detections
+    KS->>API: JSON response
+    API->>DB: Save detected objects
+    API->>EP: Response with detections
+    EP->>VS: Return via mesh
+    VS->>IG: Route response
+    IG->>U: JSON result
 ```
 
 ### Workflow Description
