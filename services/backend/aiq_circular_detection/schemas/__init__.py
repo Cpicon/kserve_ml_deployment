@@ -7,7 +7,7 @@ from .detection import (
     DetectionResponse,
 )
 from .image import ImageUploadResponse
-from .object import ObjectListSummaryResponse, ObjectSummary
+from .object import ObjectDetailResponse, ObjectListSummaryResponse, ObjectSummary
 
 __all__ = [
     "ImageUploadResponse",
@@ -17,4 +17,5 @@ __all__ = [
     "DetectionResponse",
     "ObjectSummary",
     "ObjectListSummaryResponse",
+    "ObjectDetailResponse",
 ] 
