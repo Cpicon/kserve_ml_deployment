@@ -160,23 +160,44 @@ sequenceDiagram
 │   ├── stage/              # Staging environment configs
 │   ├── prod/               # Production configs (Helm values, manifests)
 │   └── local/              # Local Kind cluster setup
+│       ├── aiq_detector/   # Model server deployment manifests
 │       ├── backend/        # Backend service K8s manifests
 │       │   ├── *.yaml      # Deployments, services, storage, Istio routing
 │       │   ├── deploy.sh   # Automated deployment script
 │       │   └── test-istio.sh # Test script with Istio integration
-│       └── test/           # Demo model and test payloads
+│       ├── test/           # Demo model and test payloads
+│       ├── install_kserve_knative.sh  # KServe/Knative installation
+│       ├── setup_ingress_routing.sh   # Ingress configuration
+│       ├── setup_kind.sh   # Kind cluster setup
+│       └── README.md       # Local environment documentation
+├── data/                   # Data directory
+├── logs/                   # Application logs
 ├── model/                  # Pretrained model artifacts
 ├── services/               # Microservices
 │   ├── backend/            # FastAPI backend service
 │   │   ├── aiq_circular_detection/  # Main application package
 │   │   ├── config/         # Configuration management
 │   │   ├── tests/          # Unit and integration tests
-│   │   └── Dockerfile      # Optimized multi-stage build
-│   └── evaluation/         # Model evaluation module
-│       ├── evaluate_model.py  # Evaluation script
-│       ├── requirements.txt   # Evaluation dependencies
-│       └── run_evaluation.sh  # Execution script
-└── scripts/                # Helper scripts
+│   │   ├── data/           # Backend data storage
+│   │   ├── logs/           # Backend service logs
+│   │   ├── Dockerfile      # Optimized multi-stage build
+│   │   ├── docker-compose.yml  # Docker Compose configuration
+│   │   ├── pyproject.toml  # Python project configuration
+│   │   ├── uv.lock         # Dependency lock file
+│   │   ├── start-dev.sh    # Development server startup
+│   │   ├── start-dev-real.sh  # Real mode development server
+│   │   └── test_full_integration.sh  # Integration tests
+│   ├── evaluation/         # Model evaluation module
+│   │   ├── dataset/        # Evaluation dataset
+│   │   ├── output/         # Evaluation results
+│   │   ├── evaluate_model.py  # Evaluation script
+│   │   ├── requirements.txt   # Evaluation dependencies
+│   │   ├── run_evaluation.sh  # Execution script
+│   │   └── README.md       # Evaluation documentation
+│   └── spec.md             # Service specifications
+├── run_all.sh              # Unified runner script (local/kind modes)
+├── run_all_k8s.sh          # Kubernetes deployment script
+└── README.md               # This file
 ```
 
 ## Getting Started
@@ -186,60 +207,24 @@ sequenceDiagram
 - Docker Desktop with Kubernetes enabled
 - `kind` - Kubernetes in Docker
 - `kubectl` - Kubernetes CLI
-- `helm` - Package manager for Kubernetes
 - `kustomize` - Tool for customizing Kubernetes YAML configurations
 - `jq` - JSON processor
-- `pack` - Pack is a CLI tool maintained by the CNB project to support the use of buildpacks (https://buildpacks.io/docs/for-platform-operators/how-to/integrate-ci/pack/)
+- `uv` - Fast Python package manager ([installation guide](https://github.com/astral-sh/uv))
 
 ### Quick Start
-
-1. **Create Kind cluster with Istio, Knative, and KServe**:
-   ```bash
-   # Create cluster
-   bash environments/local/setup_kind.sh
-   
-   # Install the full stack
-   bash environments/local/install_kserve_knative.sh
-   ```
-
-2. **Deploy the Backend Service**:
-   ```bash
-   cd environments/local/backend
-   ./deploy.sh
-   ```
-
-3. **Test the deployment**:
-   ```bash
-   # Test through Istio ingress
-   ./test-istio.sh
-   
-   # Access API documentation
-   # Visit http://localhost:8080/docs while test-istio.sh is running
-   ```
-
-4. **Deploy a sample ML model** (optional):
-   ```bash
-   kubectl create namespace kserve-test
-   kubectl apply -n kserve-test -f environments/local/test/sklearn-iris.yaml
-   ```
 
 ### Local Development Testing (No Kubernetes/Docker)
 
 For rapid development and testing without Kubernetes or Docker, you can run all services locally on your machine.
 
-#### Prerequisites for Local Testing
-
-- Python 3.9+ installed
-- `uv` - Fast Python package manager ([installation guide](https://github.com/astral-sh/uv))
-- `jq` - JSON processor
-- Available ports: 8000 (backend) and 9090 (model server)
-
-#### One-Command Local Testing
-
-Run all services and tests with a single command:
+#### Running Everything Locally
 
 ```bash
+# Run all services locally (model server + backend + tests)
 ./run_all.sh
+
+# Or explicitly specify local mode
+./run_all.sh --mode local
 ```
 
 This script will:
@@ -249,6 +234,46 @@ This script will:
 4. Run model evaluation (if dataset is available)
 5. Display performance metrics summary
 6. Keep services running for manual testing
+
+#### Running in Kubernetes (Kind)
+
+```bash
+# Set up complete K8s infrastructure and run services
+./run_all_k8s.sh
+
+# Clean up K8s infrastructure when done
+./run_all_k8s.sh --clean
+
+# Or use the parametrized script with Kind mode
+./run_all.sh --mode kind
+```
+What it does:
+1. Creates a Kind cluster with proper configuration
+2. Installs KServe, Knative, Istio, and Cert-Manager
+3. Sets up ingress routing for Kind
+4. Builds and deploys the model server
+5. Builds and deploys the backend service
+6. Runs integration tests
+7. Performs model evaluation (optional)
+
+## Scripts Overview
+
+### `run_all.sh`
+A unified script that can run services in two modes:
+- **Local mode** (default): Runs services as local processes
+- **Kind mode**: Uses existing Kubernetes infrastructure
+
+Usage:
+```bash
+./run_all.sh [--mode local|kind]
+```
+
+Features:
+- Starts model server and backend service
+- Runs integration tests
+- Performs model evaluation (if dataset is available)
+- Provides real-time logs and status
+- Automatic cleanup on exit
 
 The script handles:
 - Prerequisite checking
@@ -394,118 +419,6 @@ cd services/backend
 ./start-dev.sh
 ```
 
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Run tests and ensure the deployment works
-5. Submit a pull request
-
-For detailed documentation on the local environment setup, see `environments/local/README.md`.
-
-## Quick Start
-
-### Running Everything Locally
-
-```bash
-# Run all services locally (model server + backend + tests)
-./run_all.sh
-
-# Or explicitly specify local mode
-./run_all.sh --mode local
-```
-
-### Running in Kubernetes (Kind)
-
-```bash
-# Set up complete K8s infrastructure and run services
-./run_all_k8s.sh
-
-# Clean up K8s infrastructure when done
-./run_all_k8s.sh --clean
-
-# Or use the parametrized script with Kind mode
-./run_all.sh --mode kind
-```
-
-## Scripts Overview
-
-### `run_all.sh`
-A unified script that can run services in two modes:
-- **Local mode** (default): Runs services as local processes
-- **Kind mode**: Uses existing Kubernetes infrastructure
-
-Usage:
-```bash
-./run_all.sh [--mode local|kind]
-```
-
-Features:
-- Starts model server and backend service
-- Runs integration tests
-- Performs model evaluation (if dataset is available)
-- Provides real-time logs and status
-- Automatic cleanup on exit
-
-### `run_all_k8s.sh`
-Sets up complete Kubernetes infrastructure using Kind and deploys all services.
-
-Usage:
-```bash
-# Deploy everything
-./run_all_k8s.sh
-
-# Clean up infrastructure
-./run_all_k8s.sh --clean
-```
-
-What it does:
-1. Creates a Kind cluster with proper configuration
-2. Installs KServe, Knative, Istio, and Cert-Manager
-3. Sets up ingress routing for Kind
-4. Builds and deploys the model server
-5. Builds and deploys the backend service
-6. Runs integration tests
-7. Performs model evaluation (optional)
-
-## Project Structure
-
-```
-kserve_ml_deployment/
-├── environments/
-│   └── local/
-│       ├── aiq_detector/        # Model server deployment
-│       ├── backend/             # Backend service deployment
-│       ├── setup_kind.sh        # Kind cluster setup
-│       ├── install_kserve_knative.sh  # KServe installation
-│       └── setup_ingress_routing.sh   # Ingress configuration
-├── services/
-│   ├── backend/                 # Backend service code
-│   └── evaluation/              # Model evaluation tools
-├── run_all.sh                  # Unified runner script
-└── run_all_k8s.sh              # K8s deployment script
-```
-
-## Requirements
-
-- Docker
-- Python 3.12+
-- uv (Python package manager)
-- For Kubernetes deployment:
-  - kind
-  - kubectl
-  - helm
-  - jq
-
-## Features
-
-- **Model Server**: Custom KServe-compatible inference service for circular object detection
-- **Backend Service**: FastAPI-based service for managing images and detections
-- **Integration Tests**: Comprehensive test suite for end-to-end validation
-- **Model Evaluation**: Performance metrics calculation (F1 score, Jaccard index)
-- **Multi-environment Support**: Run locally or in Kubernetes with the same interface
-
 ## Development
 
 For detailed development instructions, see the individual README files in:
@@ -513,3 +426,11 @@ For detailed development instructions, see the individual README files in:
 - `environments/local/backend/DEPLOYMENT.md` - Backend deployment guide
 - `services/backend/README.md` - Backend development guide
 - `services/evaluation/README.md` - Evaluation tools guide
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests and ensure the deployment works
+5. Submit a pull request
