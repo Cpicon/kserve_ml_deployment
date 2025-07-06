@@ -5,7 +5,8 @@ A production-ready FastAPI backend that manages circular-object detection workfl
 ## Features
 
 * **Image management** – upload images, store metadata, retrieve detections.
-* **Model integration** – pluggable client to call external KServe model.
+* **Model integration** – pluggable client to call external KServe model with automatic circle detection on upload.
+* **Dual operation modes** – "dummy" mode for development/testing, "real" mode for production inference.
 * **REST API** – documented automatically via OpenAPI/Swagger (`/docs`).
 * **CI/CD** – GitHub Actions workflow runs Ruff linting and tests on every push.
 * **Container-ready** – lightweight image based on Python 3.12-slim.
@@ -19,6 +20,9 @@ services/backend/
 ├── aiq_circular_detection/            # Application code
 │   ├── __init__.py     # Package entrypoint
 │   ├── main.py         # FastAPI app with endpoints
+│   ├── model_client.py # ML model client for inference
+│   ├── repositories/   # Data repositories (image, objects)
+│   ├── schemas/        # Pydantic models for API
 │   └── storage/        # Storage abstraction layer
 ├── config/             # Configuration module
 │   ├── settings.py     # Pydantic settings
@@ -39,20 +43,43 @@ services/backend/
 uv venv
 
 # Use `uv` for fast installs
-uv sync --dev  # install all dependencies in dev mode
+uv sync --active --dev  # install all dependencies in dev mode
 
 # Run the dev server (option 1: using the startup script)
 ./start-dev.sh
 
-# Run the dev server (option 2: manual)
-uv run fastapi dev aiq_circular_detection
-# ➜ visit http://localhost:8000/docs → Swagger UI
-
 # Available endpoints:
+# ➜ visit http://localhost:8000/docs → Swagger UI
 # - http://localhost:8000/health - Health check
 # - http://localhost:8000/config - Current configuration
 # - http://localhost:8000/docs   - API documentation
 ```
+
+## Configuration
+
+The service supports the following key environment variables:
+
+```bash
+# Model client configuration
+MODE=dummy                            # Use "real" for actual model inference
+MODEL_SERVER_URL=http://localhost:8080 # Required for real mode
+MODEL_NAME=circular-detector          # Model name for inference endpoint
+
+# Storage configuration
+METADATA_STORAGE=memory              # Use "database" for persistence
+DATABASE_URL=sqlite:///data/db.sqlite3
+
+# See env.example for all available options
+```
+
+## Model Integration
+
+When an image is uploaded, the service automatically:
+1. Stores the image and metadata
+2. Calls the model client for circle detection
+3. Saves detected circles to the database
+4. Returns both image ID and detection results
+In **dummy mode** (default), it returns fixed test data. In **real mode**, it calls the configured model server.
 
 ## Running tests & lint
 

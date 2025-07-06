@@ -1,13 +1,13 @@
 """Pydantic schemas for circular object detection."""
 
-from typing import Dict, List, Optional
+from typing import Dict, List
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CircularObjectCreate(BaseModel):
-    """Schema for creating a new circular object detection."""
+    """Schema for creating new circular object detection."""
     
     bbox: List[float] = Field(
         ...,
@@ -61,75 +61,18 @@ class CircularObjectCreate(BaseModel):
 
 class CircularObjectResponse(CircularObjectCreate):
     """Schema for circular object detection response."""
-    
+
     model_config = ConfigDict(from_attributes=True)
-    
-    id: UUID = Field(
+
+    object_id: UUID = Field(
         ...,
         description="Unique identifier for this detection"
     )
-    
-    image_id: str = Field(
-        ...,
-        description="SHA-256 hash ID of the associated image",
-        min_length=64,
-        max_length=64,
-        pattern="^[a-f0-9]{64}$"
-    )
-
-
-class DetectionRequest(BaseModel):
-    """Schema for requesting circular object detection on an image."""
-    
-    image_id: str = Field(
-        ...,
-        description="SHA-256 hash ID of the image to process",
-        min_length=64,
-        max_length=64,
-        pattern="^[a-f0-9]{64}$"
-    )
-    
-    min_radius: Optional[float] = Field(
-        None,
-        gt=0,
-        description="Minimum radius for detection (pixels)",
-        examples=[5.0]
-    )
-    
-    max_radius: Optional[float] = Field(
-        None,
-        gt=0,
-        description="Maximum radius for detection (pixels)",
-        examples=[100.0]
-    )
-    
-    threshold: Optional[float] = Field(
-        None,
-        ge=0.0,
-        le=1.0,
-        description="Detection confidence threshold",
-        examples=[0.8]
-    )
-    
-    @field_validator("max_radius")
-    @classmethod
-    def validate_radius_range(cls, v: Optional[float], info) -> Optional[float]:
-        """Validate that max_radius is greater than min_radius if both are provided."""
-        if v is not None and "min_radius" in info.data:
-            min_radius = info.data["min_radius"]
-            if min_radius is not None and v <= min_radius:
-                raise ValueError("max_radius must be greater than min_radius")
-        return v
 
 
 class DetectionResponse(BaseModel):
     """Schema for circular object detection results."""
-    
-    image_id: str = Field(
-        ...,
-        description="SHA-256 hash ID of the processed image"
-    )
-    
+
     detections: List[CircularObjectResponse] = Field(
         ...,
         description="List of detected circular objects"
@@ -148,8 +91,7 @@ class DetectionResponse(BaseModel):
                     "image_id": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
                     "detections": [
                         {
-                            "id": "550e8400-e29b-41d4-a716-446655440000",
-                            "image_id": "a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3",
+                            "object_id": "550e8400-e29b-41d4-a716-446655440000",
                             "bbox": [10.0, 20.0, 30.0, 40.0],
                             "centroid": {"x": 20.0, "y": 30.0},
                             "radius": 10.0

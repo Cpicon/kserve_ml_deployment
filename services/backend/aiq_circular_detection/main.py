@@ -3,21 +3,28 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any
 
+import httpx
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+# Initialize database
+from aiq_circular_detection.db import init_db
 from aiq_circular_detection.dependencies import (
     get_image_repository,
+    get_model_client,
     get_object_db_repository,
     get_storage_client,
 )
+from aiq_circular_detection.model_client import ModelClient
 from aiq_circular_detection.repositories import ImageRepository
 from aiq_circular_detection.repositories.object_db import CircularObjectDBRepository
 from aiq_circular_detection.schemas import (
+    CircularObjectResponse,
+    DetectionResponse,
     ImageUploadResponse,
+    ObjectDetailResponse,
     ObjectListSummaryResponse,
     ObjectSummary,
-    ObjectDetailResponse,
 )
 from aiq_circular_detection.storage.base import StorageClient
 from config import get_settings
@@ -42,9 +49,6 @@ async def lifespan(app: FastAPI):
     
     # Ensure storage directory exists
     settings.storage_root.mkdir(parents=True, exist_ok=True)
-    
-    # Initialize database
-    from aiq_circular_detection.db import init_db
     init_db()
     
     yield
@@ -113,7 +117,9 @@ def _generate_image_id(content: bytes) -> str:
 async def upload_image(
     file: UploadFile,
     image_repository: ImageRepository = Depends(get_image_repository),
-    storage_client: StorageClient = Depends(get_storage_client)
+    storage_client: StorageClient = Depends(get_storage_client),
+    model_client: ModelClient = Depends(get_model_client),
+    object_repo: CircularObjectDBRepository = Depends(get_object_db_repository)
 ) -> ImageUploadResponse:
     """Upload an image file.
     
@@ -174,8 +180,59 @@ async def upload_image(
         
         logger.info(f"Successfully uploaded image: {image_id} -> {file_path}")
         
-        # Return response with image ID (SHA-256 hash)
-        return ImageUploadResponse(image_id=image_id)
+        # Perform model inference
+        detection_response = None
+        try:
+            # Call model client to detect circles
+            logger.debug(f"Starting circle detection for image {image_id}")
+            circles = await model_client.detect_circles(str(file_path))
+            
+            # Save detected circles to database
+            saved_circles = []
+            for circle in circles:
+                try:
+                    # Create circular object in database
+                    db_object = object_repo.create_object(
+                        image_id=image_id,
+                        bbox=circle["bbox"],
+                        centroid=circle["centroid"],
+                        radius=circle["radius"]
+                    )
+                    
+                    # Convert to response schema
+                    circle_response = CircularObjectResponse(
+                        object_id=db_object.id,
+                        bbox=db_object.bbox,
+                        centroid=db_object.centroid,
+                        radius=db_object.radius
+                    )
+                    saved_circles.append(circle_response)
+                    
+                except Exception as e:
+                    logger.error(f"Failed to save detected circle: {e}")
+                    # Continue with other circles even if one fails
+            
+            # Create detection response
+            detection_response = DetectionResponse(
+                detections=saved_circles,
+                count=len(saved_circles)
+            )
+            
+            logger.info(f"Successfully detected and saved {len(saved_circles)} circles for image {image_id}")
+            
+        except Exception as e:
+            # Log the error but don't fail the upload
+            logger.error(f"Model inference failed for image {image_id}: {e}")
+            # Check if it's an HTTP error that should be propagated as 502
+            if isinstance(e, httpx.HTTPStatusError):
+                if e.response.status_code >= 500:
+                    raise HTTPException(status_code=502, detail="Model inference failed")
+        
+        # Return response with image ID and detection results
+        return ImageUploadResponse(
+            image_id=image_id,
+            detection=detection_response
+        )
         
     except ValueError as e:
         # This shouldn't happen since we already checked existence

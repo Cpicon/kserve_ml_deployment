@@ -6,6 +6,7 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from aiq_circular_detection.db import get_db
+from aiq_circular_detection.model_client import ModelClient, create_model_client
 from aiq_circular_detection.repositories import (
     ImageDBRepository,
     ImageRepository,
@@ -24,6 +25,9 @@ _in_memory_repository: InMemoryImageRepository | None = None
 
 # Global instance for storage client
 _storage_client: StorageClient | None = None
+
+# Global instance for model client
+_model_client: ModelClient | None = None
 
 
 def get_image_repository(db: Session = Depends(get_db)) -> ImageRepository:
@@ -96,4 +100,25 @@ def get_storage_client() -> StorageClient:
             logger.warning(f"Unknown storage type: {settings.storage_type}, defaulting to local")
             _storage_client = LocalStorageClient()
     
-    return _storage_client 
+    return _storage_client
+
+
+def get_model_client() -> ModelClient:
+    """Get the appropriate model client based on configuration.
+    
+    This function returns the correct model client implementation based on
+    the MODE environment variable:
+    - "dummy": Uses DummyModelClient (returns fixed test data)
+    - "real": Uses RealModelClient (calls actual model server)
+    
+    Returns:
+        ModelClient: The configured model client instance
+    """
+    global _model_client
+    
+    if _model_client is None:
+        settings = get_settings()
+        _model_client = create_model_client(settings)
+        logger.info(f"Created model client for mode: {settings.mode}")
+    
+    return _model_client 
