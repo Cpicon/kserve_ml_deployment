@@ -12,14 +12,19 @@ fi
 # Check if virtual environment exists
 if [ ! -d ".venv" ]; then
     echo "📦 Creating virtual environment..."
-    python3 -m venv .venv
+    # create a virtual environment in the current directory with python 3.12 using uv
+    uv venv --python 3.12
 fi
 
 echo "🔧 Activating virtual environment..."
 source .venv/bin/activate
 
 echo "📦 Installing dependencies..."
-pip install -r requirements.txt
+# use uv to install the dependencies
+uv pip install -r requirements.txt
+
+# run the model server
+uv run model.py --model_name=aiq-detector --http_port=9090
 
 echo "🚀 Starting model server on port 9090..."
 echo "📖 Swagger UI will be available at: http://localhost:9090/docs"
