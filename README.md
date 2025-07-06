@@ -14,27 +14,49 @@ The following diagram illustrates the complete request flow when a user uploads 
 
 ```mermaid
 flowchart TB
-    User[User/Client] -->|1. POST /images/| Gateway[Istio Gateway :80/:443]
-    Gateway -->|2. Routes via VirtualService| Service[Backend Service]
+    User[User/Client] 
     
-    subgraph Backend["Backend Pod (FastAPI + Envoy)"]
-        Service --> Envoy1[Envoy Proxy]
-        Envoy1 --> FastAPI[FastAPI :8000]
-        FastAPI --> Storage[(Storage)]
-        FastAPI --> DB[(Database)]
+    subgraph K8s["Kubernetes Cluster"]
+        Gateway[Istio Gateway :80/:443]
+        
+        subgraph NS1["Namespace: aiq-backend"]
+            Service[Backend Service]
+            
+            subgraph BackendPod["Backend Pod"]
+                Envoy1[Envoy Proxy]
+                FastAPI[FastAPI :8000]
+            end
+            
+            Storage[(PVC Storage)]
+            DB[(SQLite DB)]
+        end
+        
+        subgraph NS2["Namespace: kserve-test"]
+            ModelService[Model Service]
+            
+            subgraph ModelDeployment["KServe Deployment"]
+                Knative[Knative Autoscaler]
+                
+                subgraph ModelPod["Model Pod"]
+                    Envoy2[Envoy Proxy]
+                    Model[Model Server :8080]
+                end
+            end
+        end
+        
+        Gateway --> Service
+        Service --> Envoy1
+        Envoy1 --> FastAPI
+        FastAPI --> Storage
+        FastAPI --> DB
+        FastAPI --> ModelService
+        ModelService --> Knative
+        Knative --> ModelPod
+        Envoy2 --> Model
     end
     
-    FastAPI -->|3. Inference Request| ModelService[Model Service]
-    
-    subgraph KServe["KServe Model Service"]
-        ModelService --> Knative[Knative Autoscaler]
-        Knative -->|4. Scale 0→1| ModelPod[Model Pod]
-        ModelPod --> Envoy2[Envoy Proxy]
-        Envoy2 --> Model[Model Server :8080]
-    end
-    
-    Model -->|5. Detection Results| FastAPI
-    FastAPI -->|6. Response| User
+    User --> Gateway
+    Gateway --> User
     
     style Gateway fill:#4285F4,color:#fff
     style FastAPI fill:#34A853,color:#fff
@@ -42,27 +64,48 @@ flowchart TB
     style Knative fill:#EA4335,color:#fff
 ```
 
+### Request Flow Steps
+
+1. **User → Istio Gateway**: Client sends POST request to `/images/` endpoint
+2. **Gateway → Backend Service**: VirtualService routes request to backend service
+3. **Service → Pod**: Kubernetes service load balances to backend pod
+4. **Envoy → FastAPI**: Sidecar proxy forwards request with mTLS
+5. **FastAPI Processing**:
+   - Stores image in PVC-backed storage
+   - Saves metadata to SQLite database
+   - Prepares inference request
+6. **FastAPI → Model Service**: Sends base64 image for inference
+7. **Knative Autoscaling**: Scales model pod from 0 to 1 if needed
+8. **Model Inference**: Detects circles and returns bounding boxes
+9. **Response Flow**: Results flow back through the same path
+10. **User Response**: Client receives JSON with detected objects
+
 ### Detailed Request Flow
 
 ```mermaid
 sequenceDiagram
-    participant U as User
-    participant IG as Istio Gateway
-    participant VS as VirtualService
-    participant EP as Envoy Proxy
-    participant API as FastAPI Backend
-    participant S as Storage (PVC)
-    participant DB as Database
-    participant KS as KServe
-    participant M as Model Server
+    box External
+        participant U as User
+    end
     
-    U->>IG: POST /images/ (image file)
+    box Kubernetes Cluster
+        participant IG as Istio Gateway
+        participant VS as VirtualService
+        participant EP as Envoy Proxy
+        participant API as FastAPI Backend
+        participant S as Storage PVC
+        participant DB as Database
+        participant KS as KServe
+        participant M as Model Server
+    end
+    
+    U->>IG: POST /images/ with image file
     IG->>VS: Route based on path
     VS->>EP: Forward to backend service
     EP->>API: mTLS secured request
     API->>S: Store image file
     API->>DB: Save image metadata
-    API->>KS: Request inference (base64 image)
+    API->>KS: Request inference with base64 image
     Note over KS: Knative scales from 0 to 1
     KS->>M: Forward to model pod
     M->>M: Detect circles
