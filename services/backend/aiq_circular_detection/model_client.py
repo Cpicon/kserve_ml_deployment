@@ -126,10 +126,10 @@ class RealModelClient(ModelClient):
 
 
 class DummyModelClient(ModelClient):
-    """Mock model client that returns fixed dummy data."""
+    """Mock model client that returns fixed fake data."""
     
     def __init__(self, settings: Settings):
-        """Initialize the dummy model client.
+        """Initialize the fake model client.
         
         Args:
             settings: Application settings (not used but kept for consistency)
@@ -137,21 +137,17 @@ class DummyModelClient(ModelClient):
         self.settings = settings
         
     async def detect_circles(self, image_path: str) -> List[Dict[str, any]]:
-        """Return dummy circle detection results.
+        """Return fake circle detection results.
         
         Args:
             image_path: Path to the image file (used for logging only)
             
         Returns:
-            Fixed list with one dummy circle
+            Fixed list with one fake circle
         """
-        # Log start of dummy inference
+        # Log start of fake inference
         logger.debug(f"Starting dummy model inference for image: {image_path}")
         start_time = time.time()
-        
-        # Simulate some processing time
-        import asyncio
-        await asyncio.sleep(0.1)
         
         # Return fixed dummy data
         dummy_circles = [

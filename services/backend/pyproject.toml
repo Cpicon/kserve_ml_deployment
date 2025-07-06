@@ -30,6 +30,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest>=8.1.1",
+  "pytest-asyncio>=1.0.0",
   "ruff>=0.4.4",
   "pillow>=10.0.0",
 ]
@@ -44,3 +45,8 @@ packages = ["aiq_circular_detection", "config"]
 [tool.ruff]
 line-length = 100
 select = ["E", "F", "I"]
+
+[dependency-groups]
+dev = [
+    "pytest-asyncio>=1.0.0",
+]
