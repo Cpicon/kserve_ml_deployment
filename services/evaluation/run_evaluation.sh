@@ -98,7 +98,7 @@ check_dataset() {
     # Count images
     image_count=$(find dataset -name "*.jpg" -type f | wc -l)
     if [ $image_count -eq 0 ]; then
-        echo -e "${RED}❌ No .jpg images found in dataset directory${NC}"
+        echo -e "${RED}❌ No .jpg images found in services/evaluation/dataset directory${NC}"
         return 1
     fi
     
