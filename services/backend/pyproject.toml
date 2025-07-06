@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiq-circular-detection"
+version = "0.1.0"
+description = "FastAPI backend for circular-object detection workflows"
+readme = "README.md"
+authors = [
+  { name = "Your Name", email = "you@example.com" }
+]
+requires-python = ">=3.12"
+license = { text = "MIT" }
+
+# Application dependencies
+dependencies = [
+  "fastapi[standard]>=0.115.14",
+  "uvicorn[standard]>=0.35.0",
+  "SQLAlchemy>=2.0.41",
+  "pydantic>=2.11.7",
+  "httpx>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.1.1",
+  "ruff>=0.4.4"
+]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "I"]
