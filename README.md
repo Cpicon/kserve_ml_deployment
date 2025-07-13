@@ -205,6 +205,7 @@ sequenceDiagram
 - `kustomize` - Tool for customizing Kubernetes YAML configurations
 - `jq` - JSON processor
 - `uv` - Fast Python package manager ([installation guide](https://github.com/astral-sh/uv))
+- `just` - Modern command runner ([installation guide](https://just.systems/man/en/installation.html)) - **Required**
 
 ### Quick Start
 
@@ -214,7 +215,7 @@ For rapid development and testing without Kubernetes or Docker, run all services
 
 ```bash
 # Run all services locally (model server + backend + tests)
-make dev
+just dev
 ```
 
 This command will:
@@ -230,20 +231,30 @@ This command will:
 For testing in a real Kubernetes environment:
 
 ```bash
-# First time or full infrastructure test (deploys everything and runs tests)
-make k8s-setup     # Keeps infrastructure running after tests
+# Set up Kubernetes development environment (one-time setup)
+just dev --k8s          # or just dev -k
 
-# Subsequent test runs (reuses existing infrastructure)
-make k8s-test      # Auto-detects and sets up infrastructure if needed
+# Run tests on Kubernetes (auto-detects and sets up if needed)
+just test --k8s         # or just test -k
 
 # Clean up when done
-make k8s-clean
+just clean --k8s        # or just clean -k
+```
+
+**Advanced Options:**
+```bash
+# Clean first, then setup fresh infrastructure
+just dev --k8s --clean
+
+# Force delete entire cluster
+just clean --k8s --force
 ```
 
 **Key Features:**
-- `make k8s-test` automatically sets up infrastructure if it doesn't exist
-- `make k8s-setup` prevents automatic cleanup after tests
+- `just test --k8s` automatically sets up infrastructure if it doesn't exist
+- `just dev --k8s` sets up and keeps infrastructure running for development
 - Infrastructure persists between test runs for faster iteration
+- Smart auto-detection prevents redundant setup
 
 **What happens during setup:**
 1. Creates a Kind cluster with proper configuration
@@ -266,10 +277,11 @@ If you prefer to run services individually:
 1. **Start the Model Server**:
    ```bash
    # Interactive mode (blocks terminal)
-   make model-server
+   just model-server
    
-   # Or background mode (non-blocking)
-   make model-server-bg
+   # Background mode (non-blocking)
+   just model-server --background
+   just model-server -b            # Short flag
    # Model server will run on http://localhost:9090
    # Swagger UI: http://localhost:9090/docs
    ```
@@ -277,10 +289,14 @@ If you prefer to run services individually:
 2. **Start the Backend Service**:
    ```bash
    # Dummy mode (no model server required)
-   make backend
+   just backend
+   just backend --background       # Background mode
+   just backend -b                 # Background mode (short)
    
    # Real mode (requires model server running)
-   make backend-real
+   just backend --real             # Interactive
+   just backend --real --background # Background
+   just backend -r -b              # Real + background (short flags)
    # Backend API will run on http://localhost:8000
    # API Docs: http://localhost:8000/docs
    ```
@@ -288,20 +304,33 @@ If you prefer to run services individually:
 3. **Run Integration Tests**:
    ```bash
    # Automatic mode (starts services, runs tests, cleans up)
-   make test
+   just test
    
    # Manual mode (assumes services already running)
-   make test-manual
+   just test --manual
+   just test -m                    # Short flag
+   
+   # Run tests on Kubernetes (auto-setup if needed)
+   just test --k8s
+   just test -k                    # Short flag
+   ```
+
+4. **Cleanup**:
+   ```bash
+   just clean                      # Stop all local services
+   just clean --k8s                # Clean up Kubernetes resources
+   just clean -k                   # Clean up Kubernetes (short)
    ```
 
 #### Troubleshooting Local Development
 
-- **Port conflicts**: Use `make clean` to stop all services and free ports
+- **Port conflicts**: Use `just clean` to stop all services and free ports
 - **Model download**: First run downloads the AI model (~300MB)
-- **Logs**: Use `make logs` to view service logs or check `logs/` directory
-- **Service status**: Use `make status` and `make health` to check service state
-- **Dependencies**: Use `make check-deps` to verify required tools are installed
-- **Cleanup**: Use `make clean` to stop all services gracefully
+- **Logs**: Use `just logs` to view service logs or check `logs/` directory
+- **Service status**: Use `just status` and `just health` to check service state
+- **Dependencies**: Use `just check-deps` to verify required tools are installed
+- **Cleanup**: Use `just clean` for local services, `just clean --k8s` for Kubernetes
+- **Help**: Use `just` to see all available commands organized by category
 
 ### API Endpoints
 
@@ -385,40 +414,56 @@ See `services/evaluation/README.md` for detailed documentation.
 
 ### Quick Commands
 
-All development tasks can be managed through the Makefile:
+All development tasks are managed through Just commands:
 
 ```bash
-# View all available commands
-make help
+# View all available commands organized by category
+just
 
 # Development workflow
-make dev              # Start local development environment
-make test             # Run integration tests (auto-manages services)
-make pytest           # Run unit tests only
-make lint             # Run code linting
-make eval             # Run model evaluation
+just dev              # Start local development environment
+just dev --k8s        # Start Kubernetes development environment
+just test             # Run integration tests (auto-manages services)
+just test --manual    # Run tests (assumes services running)
+just test --k8s       # Run tests on Kubernetes (auto-setup if needed)
 
 # Service management
-make model-server     # Start model server (interactive)
-make model-server-bg  # Start model server (background)
-make backend          # Start backend (dummy mode)
-make backend-real     # Start backend (real mode)
+just model-server               # Start model server (interactive)
+just model-server --background  # Start model server (background)
+just model-server -b            # Start model server (background, short)
+just backend                    # Start backend (dummy mode)
+just backend --real             # Start backend (real mode)
+just backend --real --background # Real mode + background
+just backend -r -b              # Real mode + background (short flags)
+just clean                      # Clean up all local services
+just clean --k8s                # Clean up Kubernetes resources
 
-# Kubernetes workflow
-make k8s-setup        # Setup Kind cluster and deploy services
-make k8s-test         # Test on existing cluster
-make k8s-clean        # Clean up Kubernetes resources
+# Evaluation and testing
+just eval             # Run model evaluation (requires dataset)
+just lint             # Run code linting
+just pytest           # Run unit tests only
 
 # Utilities
-make status           # Check service status
-make health           # Check service health
-make logs             # View local service logs
-make k8s-logs         # View Kubernetes service logs
-make clean            # Clean up local services and logs
-make endpoints        # Show service endpoints
-make install-deps     # Install development dependencies
-make check-deps       # Verify required tools are installed
+just status           # Check service status
+just health           # Check service health
+just logs             # View local service logs
+just k8s-logs         # View Kubernetes service logs
+just endpoints        # Show service endpoints
+just install-deps     # Install development dependencies
+just check-deps       # Verify required tools are installed
 ```
+
+### Why Just? Modern Advantages
+
+Just provides significant advantages over traditional build tools:
+
+- **🚀 Intuitive Flags**: `just model-server --background` vs separate commands
+- **📏 Short Flags**: `just backend -r -b` (real + background), `just test -k` (Kubernetes)
+- **🔗 Flag Combinations**: Mix and match flags naturally (`--k8s --clean`)
+- **🧠 Smart Auto-Detection**: `just test --k8s` sets up infrastructure if needed
+- **🌍 Cross-Platform**: Works consistently across macOS, Linux, and Windows
+- **⚡ Modern Syntax**: Cleaner, more readable command definitions
+- **📋 Organized Help**: Commands grouped by category with `just`
 
 ### Traditional Commands (if needed)
 ```bash
