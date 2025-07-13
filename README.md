@@ -214,10 +214,10 @@ For rapid development and testing without Kubernetes or Docker, run all services
 
 ```bash
 # Run all services locally (model server + backend + tests)
-./run_all.sh --mode local
+make dev
 ```
 
-This script will:
+This command will:
 1. Start the AI model server on port 9090
 2. Start the backend API service on port 8000
 3. Run integration tests automatically
@@ -231,18 +231,18 @@ For testing in a real Kubernetes environment:
 
 ```bash
 # First time or full infrastructure test (deploys everything and runs tests)
-./run_all_k8s.sh --keep-running  # Keeps infrastructure running after tests
+make k8s-setup     # Keeps infrastructure running after tests
 
 # Subsequent test runs (reuses existing infrastructure)
-./run_all.sh --mode kind          # Auto-detects and sets up infrastructure if needed
+make k8s-test      # Auto-detects and sets up infrastructure if needed
 
 # Clean up when done
-./run_all_k8s.sh --clean
+make k8s-clean
 ```
 
 **Key Features:**
-- `./run_all.sh --mode kind` automatically sets up infrastructure if it doesn't exist
-- `./run_all_k8s.sh --keep-running` prevents automatic cleanup after tests
+- `make k8s-test` automatically sets up infrastructure if it doesn't exist
+- `make k8s-setup` prevents automatic cleanup after tests
 - Infrastructure persists between test runs for faster iteration
 
 **What happens during setup:**
@@ -265,32 +265,43 @@ If you prefer to run services individually:
 
 1. **Start the Model Server**:
    ```bash
-   cd environments/local/aiq_detector
-   ./run_local.sh
+   # Interactive mode (blocks terminal)
+   make model-server
+   
+   # Or background mode (non-blocking)
+   make model-server-bg
    # Model server will run on http://localhost:9090
    # Swagger UI: http://localhost:9090/docs
    ```
 
-2. **Start the Backend Service** (in a new terminal):
+2. **Start the Backend Service**:
    ```bash
-   cd services/backend
-   ./start-dev-real.sh
+   # Dummy mode (no model server required)
+   make backend
+   
+   # Real mode (requires model server running)
+   make backend-real
    # Backend API will run on http://localhost:8000
    # API Docs: http://localhost:8000/docs
    ```
 
-3. **Run Integration Tests** (in a new terminal):
+3. **Run Integration Tests**:
    ```bash
-   cd services/backend
-   ./test_full_integration.sh
+   # Automatic mode (starts services, runs tests, cleans up)
+   make test
+   
+   # Manual mode (assumes services already running)
+   make test-manual
    ```
 
 #### Troubleshooting Local Development
 
-- **Port conflicts**: Ensure ports 8000 and 9090 are free
+- **Port conflicts**: Use `make clean` to stop all services and free ports
 - **Model download**: First run downloads the AI model (~300MB)
-- **Logs**: Check `logs/model_server.log` and `logs/backend_server.log`
-- **Cleanup**: Use `Ctrl+C` to stop all services gracefully
+- **Logs**: Use `make logs` to view service logs or check `logs/` directory
+- **Service status**: Use `make status` and `make health` to check service state
+- **Dependencies**: Use `make check-deps` to verify required tools are installed
+- **Cleanup**: Use `make clean` to stop all services gracefully
 
 ### API Endpoints
 
@@ -372,25 +383,56 @@ See `services/evaluation/README.md` for detailed documentation.
 
 ## Development
 
-### Running Tests
+### Quick Commands
+
+All development tasks can be managed through the Makefile:
+
 ```bash
-cd services/backend
-pytest
+# View all available commands
+make help
+
+# Development workflow
+make dev              # Start local development environment
+make test             # Run integration tests (auto-manages services)
+make pytest           # Run unit tests only
+make lint             # Run code linting
+make eval             # Run model evaluation
+
+# Service management
+make model-server     # Start model server (interactive)
+make model-server-bg  # Start model server (background)
+make backend          # Start backend (dummy mode)
+make backend-real     # Start backend (real mode)
+
+# Kubernetes workflow
+make k8s-setup        # Setup Kind cluster and deploy services
+make k8s-test         # Test on existing cluster
+make k8s-clean        # Clean up Kubernetes resources
+
+# Utilities
+make status           # Check service status
+make health           # Check service health
+make logs             # View local service logs
+make k8s-logs         # View Kubernetes service logs
+make clean            # Clean up local services and logs
+make endpoints        # Show service endpoints
+make install-deps     # Install development dependencies
+make check-deps       # Verify required tools are installed
 ```
 
-### Building Docker Image
+### Traditional Commands (if needed)
 ```bash
-cd services/backend
-docker build -t aiq-circular-detection:latest .
+# Running Tests
+cd services/backend && pytest
+
+# Building Docker Image
+cd services/backend && docker build -t aiq-circular-detection:latest .
+
+# Local Development
+cd services/backend && ./start-dev.sh
 ```
 
-### Local Development
-```bash
-cd services/backend
-./start-dev.sh
-```
-
-## Development
+### Additional Resources
 
 For detailed development instructions, see the individual README files in:
 - `environments/local/aiq_detector/README.md` - Model server details

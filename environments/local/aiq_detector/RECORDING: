@@ -1,0 +1,169 @@
+
+se:
+
+Discuss IT data safety and solution alignment for AI pilot project between Amrize and Aicrete.
+
+Issues & Tickets:
+
+Data Security and IP Protection
+
+Context:
+
+Amrize wants to implement Aicrete's AI-powered quality control system but has concerns about data security. Aicrete wants to protect their IP. Previous proposals have not satisfied both parties' requirements.
+
+Status:
+
+No mutually agreeable solution has been found for the full commercial implementation. A limited proof of concept (POC) approach has been proposed.
+
+Concerns, Challenges, and Blockers
+
+  - Amrize doesn't want sensitive data leaving their systems
+  - Aicrete doesn't want their source code exposed on Amrize's infrastructure
+  - Full product integration desired, not just AI optimization
+
+Ideas and Explanations
+
+  - Use of AWS Nitro or confidential computing suggested but may require significant developm  - Use of AWS Nitro or confidential computing I   - Use of AWS Nitro or confidential computing suggested but may require sPOC
+
+Decisions and Next Steps
+
+  - Proceed with limited POC using manual data entry for 6 non-sensitive mix designs
+  - Schedule follow-up meeting to discuss commercial phase collaboration
+  - Both parties to consider technical solutions for secure full product implementation
+
+Current Objective:
+
+Successfully complete POC while developing a mutually acceptable plan for full commercial implementation that protects both parties' interests.
+
+Other & Incidental Topics
+
+Aicrete Product Offering
+
+Aicrete offers a full QC platform with integrated AI, not just an optimization tool, which is their key differentiator.
+
+Amrize's Ongoing Projects
+
+Amrize is undergoing changes in dispatch systems in North America, which may impact future integrations.
+
+Clarification on "Private Cloud"
+
+Discussion revealed that the proposed solution is not truly a private cloud, but a separate AWS instance for Amrize data.
+Action Items
+  - Research AWS clean rooms, other relevant AWS services for secure data sharing. Prep options for next meeting.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=1688.9999
+  - Review current Amrize AWS setup. Identify potential integration points for AI Crete solution.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=3169.9999
+  - Explore tech options (e.g. confidential computing, JIT compilation) for secure model deployment. Prep ideas for next meeting.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=3350.9999
+  - Research tech options for secure container deployment. Prep ideas for commercial phase architecture.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=4628.9999
+  - Schedule follow-up meeting re commercial phase collab. Invite all participants.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=4938.9999
+  - Discuss w/ team, prep proposal for commercial phase collab. Consider security, modularity, integration w/ Amrize systems.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=4949.9999
+  - Review resource availability for joint AI Crete collab. Prep IT perspective on integration possibilities.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=4969.9999
+Annotations
+HIGHLIGHT
+  - Eswar asks about AI Creed's product catalog and model availability - WATCH (40 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=653.41877
+  - Byron explains data architecture setup between corporate and vendor accounts for model training - WATCH (2 mins): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=931.698976
+  - Eswar explains AWS root account limitations for AI Crete's OS integration - WATCH (2 mins): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=1587.888224
+IT data safety discussion with Aicrete - July 07
+VIEW RECORDING: https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk
+Customer Success and Acct Mgmt - REACH™
+
+Call Context
+
+Meeting to discuss IT data safety concerns related to the AI Crete OS solution. Key focus on finding a technical architecture that protects both Amrize's data and AI Crete's intellectual property.
+
+Relationships (R)
+
+  - Aida (Amrize) - Project manager championing AI Crete adoption internally
+  - Mirela (Amrize) - IT leader evaluating security aspects
+  - Christian (Holcim) - ML/Ops engineer with 8 years experience in ML infrastructure
+  - Multiple business units (Dallas, DC/Maryland, West Canada) already engaged with AI Crete demos
+
+Engagement (E)
+
+  - No current product usage yet - discussions are pre-POC
+  - Teams in Dallas, DC/Maryland, and West Canada have seen product demos
+  - Business stakeholders expressed strong interest in AI Crete OS as complete platform
+  - Business users value the quality control integration with AI capabilities
+
+Actions (A)
+
+  - Working to establish a POC with limited functionality (6 mixes, manual data entry)
+  - Seeking agreement on a security architecture for commercial deployment
+  - Multiple technical discussions with AWS to find a viable solution
+
+Customer Value (C)
+
+  - AI Crete OS valued for being more than just AI optimization - includes quality control integration
+  - Potential to replace current Quadrel system (competitive advantage over other AI solutions)
+  - Value proposition is the complete platform, not just isolated ML models
+
+Horizons (H)
+
+  - Phased approach planned: POC → Commercial (two plants) → Broader NA deployment
+  - Long-term vision to potentially replace existing quality control systems company-wide
+  - Timeline extends at least one year for testing full capabilities
+
+Next Steps and Recommendations to Grow the Account
+
+  - Schedule follow-up meeting to clarify commercial phase collaboration approach
+  - Define technical architecture that protects both parties' IP and data
+  - Document roles, responsibilities, and support needs from both organizations
+  - Proceed with POC using manually entered data for limited testing
+
+Growth Opportunities Identified
+
+  - Quality control platform replacement across North America
+  - Integrations with dispatch systems and other operational technologies
+  - Potential for custom solution development specifically for Amrize
+
+Other Useful Information
+
+  - AI Crete has two main products: AIcrete OS (software platform with AI) and Accents (computer vision sensor)
+  - Current dispatch system change project underway in North America
+  - POC will use non-sensitive mix designs (low-end materials)
+
+Q&A
+
+Questions They Asked
+
+How would Nitro or confidential computing protect our source code?
+
+Christian explained that technologies like confidential computing can encrypt containers so even infrastructure owners cannot access source code. ML models could be compiled to JIT (C++ binary code) that cannot be reverse-engineered, then deployed in encrypted containers.
+
+Would AWS Clean Rooms work for this architecture?
+
+Eswar clarified that Clean Rooms could potentially work but would require deeper integration discussions. The solution would need to focus on ML models specifically, not entire container images or executables.
+
+Questions We Asked
+
+What specific products are being offered to Amrize?
+
+Parham explained they have two products: AIcrete OS (software platform with AI engine for quality control/operations) and Accents (aggregate sensor using AI for moisture, gradation and shape analysis). The focus for Amrize is primarily AIcrete OS.
+
+What are your concerns with the proposed architecture?
+
+AI Crete explained their concern was that Amrize could access their proprietary source code and ML models if deployed in Amrize's AWS environment, as the root account would always have administrative access to any sub-accounts.
+
+Can we create a modular API-based solution?
+
+AI Crete explained their product is not currently structured for API-only access - their AI is deeply integrated into their platform. Creating a modular solution would require significant development work.
+
+Action Items
+
+  - Christian to draft technical options with Eswar for potential solutions
+  - AI Crete team to consider if they're willing to invest in developing a secure architecture
+  - Schedule follow-up meeting to align on commercial phase approach
+  - Define POC scope with manual data entry of 6 non-sensitive mixes
+Action Items
+  - Research AWS clean rooms, other relevant AWS services for secure data sharing. Prep options for next meeting.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=1688.9999
+  - Review current Amrize AWS setup. Identify potential integration points for AI Crete solution.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=3169.9999
+  - Explore tech options (e.g. confidential computing, JIT compilation) for secure model deployment. Prep ideas for next meeting.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=3350.9999
+  - Research tech options for secure container deployment. Prep ideas for commercial phase architecture.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=4628.9999
+  - Schedule follow-up meeting re commercial phase collab. Invite all participants.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=4938.9999
+  - Discuss w/ team, prep proposal for commercial phase collab. Consider security, modularity, integration w/ Amrize systems.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=4949.9999
+  - Review resource availability for joint AI Crete collab. Prep IT perspective on integration possibilities.  - WATCH (5 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=4969.9999
+Annotations
+HIGHLIGHT
+  - Eswar asks about AI Creed's product catalog and model availability - WATCH (40 secs): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=653.41877
+  - Byron explains data architecture setup between corporate and vendor accounts for model training - WATCH (2 mins): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=931.698976
+  - Eswar explains AWS root account limitations for AI Crete's OS integration - WATCH (2 mins): https://fathom.video/share/JcV8xzkaJBeJ2gxTfLdoeCzuY4ynJ8dk?timestamp=1587.888224
+
+

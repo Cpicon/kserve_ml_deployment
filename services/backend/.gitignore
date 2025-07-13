@@ -1,0 +1,42 @@
+# Local data directory
+data/
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files
+.env
+.env.local
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# OS files
+.DS_Store
+Thumbs.db 
