@@ -72,7 +72,9 @@ if [ "$MODE" = "real" ]; then
     else
         echo -e "${RED}❌ Model server is not running at ${MODEL_SERVER_URL}${NC}"
         echo -e "${RED}Please start the model server first:${NC}"
-        echo -e "${BLUE}cd environments/local/aiq_detector && ./run_local.sh${NC}"
+        echo -e "${BLUE}Option 1 (Recommended): make model-server-bg${NC}"
+        echo -e "${BLUE}Option 2 (New terminal): make model-server${NC}"
+        echo -e "${YELLOW}Or use direct script: cd environments/local/aiq_detector && ./run_local.sh${NC}"
         exit 1
     fi
 else

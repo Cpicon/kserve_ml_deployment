@@ -185,3 +185,4 @@ Thumbs.db
 # Local testing
 *.test.json
 test_output/
+CLAUDE.md

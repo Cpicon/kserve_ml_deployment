@@ -28,7 +28,8 @@ echo -e "${BLUE}Checking backend service...${NC}"
 if ! curl -sf "${API_URL}/health" -o /dev/null; then
     echo -e "${RED}❌ Backend service is not running${NC}"
     echo -e "${YELLOW}Please start the backend service first:${NC}"
-    echo -e "${BLUE}./start-dev-real.sh${NC}"
+    echo -e "${BLUE}make backend-real${NC}"
+    echo -e "${YELLOW}Or use the direct script: ./start-dev-real.sh${NC}"
     exit 1
 fi
 echo -e "${GREEN}✅ Backend service is running${NC}"
