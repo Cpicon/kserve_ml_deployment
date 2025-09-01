@@ -128,6 +128,8 @@ graph LR
 
 **Technical Implementation**: PagedAttention divides the KV cache into fixed-size blocks (typically 16 tokens per block), managed through a block table that maps logical block numbers to physical block addresses. During attention computation, the system performs gather operations to fetch the required blocks, similar to how operating systems handle virtual memory paging. The block size is carefully chosen to balance between memory fragmentation (smaller blocks reduce waste) and computational efficiency (larger blocks improve memory access patterns). The system implements sophisticated memory management algorithms including reference counting for shared blocks, lazy allocation for growing sequences, and preemptive eviction policies when memory pressure increases.
 
+> 📚 **Kernel Implementation**: For detailed CUDA implementations, memory access patterns, and optimization techniques, see [PagedAttention Kernel Deep Dive](GPU/paged-attention-kernel-deep-dive.md).
+
 **The Solution Explained Simply**: It's like using modular furniture that can be rearranged and shared. Instead of giving each guest their own fixed dining table, you use small tables that can be combined as needed and shared when guests have the same appetizers.
 
 ### Key Architectural Components
@@ -441,7 +443,7 @@ A: Several factors influence the optimal configuration:
 2. **Interconnect Bandwidth**: NVLink supports up to 8-way efficiently, PCIe typically 2-4 way
 3. **Batch Size**: Larger batches amortize communication cost better
 4. **Latency Requirements**: More parallelism reduces memory per GPU but increases communication
-The rule of thumb is TP size = √(number of GPUs) for balanced parallelism, e.g., 4-way TP for 16 GPUs.
+The rule of thumb is TP size = $\sqrt{\text{number of GPUs}}$ for balanced parallelism, e.g., 4-way TP for 16 GPUs.
 
 **Q: How does tensor parallelism interact with PagedAttention?**
 A: They complement each other well:
@@ -478,13 +480,23 @@ graph LR
 
 ### Technical Deep Dive
 
-**FlashAttention** addresses the memory bandwidth bottleneck in attention computation by tiling the attention matrix computation to fit in GPU SRAM (Static RAM). Traditional attention requires O(N²) memory where N is sequence length, causing frequent HBM (High Bandwidth Memory) accesses. FlashAttention reduces this to O(N) by computing attention incrementally, keeping intermediate results in faster SRAM. The algorithm employs online softmax computation and reduces HBM accesses from O(N²) to O(N), achieving 2-3x wall-clock speedup.
+**FlashAttention** addresses the memory bandwidth bottleneck in attention computation by tiling the attention matrix computation to fit in GPU SRAM (Static RAM). Traditional attention requires $O(N^2)$ memory where N is sequence length, causing frequent HBM (High Bandwidth Memory) accesses. FlashAttention reduces this to $O(N)$ by computing attention incrementally, keeping intermediate results in faster SRAM. The algorithm employs online softmax computation and reduces HBM accesses from $O(N^2)$ to $O(N)$, achieving 2-3x wall-clock speedup.
 
 > 💡 **New to GPU terminology?** HBM and SRAM are part of the GPU memory hierarchy. See [GPU Architecture Essentials](GPU/gpu-architecture-essentials.md) for a quick introduction to these and other critical GPU concepts.
+>
+> 📚 **Deep Dive**: For comprehensive understanding of the tiling strategy, online softmax algorithm, and CUDA implementations, see [FlashAttention Kernel Deep Dive](GPU/flashattention-kernel-deep-dive.md).
 
 **Paged Attention Kernels** extend FlashAttention with gather/scatter operations to handle non-contiguous memory layouts. These kernels implement efficient block-sparse attention patterns where the KV cache blocks may be scattered across GPU memory. The implementation uses CUDA's texture memory for efficient random access patterns and implements custom warp-level primitives for coalesced memory access despite the indirection.
 
+> 📚 **Deep Dive**: Learn about texture memory optimization, Copy-on-Write mechanisms, and the complete PagedAttention implementation in [PagedAttention Kernel Deep Dive](GPU/paged-attention-kernel-deep-dive.md).
+
 **GEMM Optimization** leverages tensor cores on modern GPUs (Volta and newer) for accelerated matrix multiplication. vLLM implements multiple GEMM strategies: standard cuBLAS for large matrices, custom kernels for small matrices common in attention computation, and specialized INT8/INT4 GEMM for quantized models. The kernels are autotuned at runtime to select optimal configurations based on matrix dimensions.
+
+> 📚 **Deep Dive**: Explore hierarchical tiling, Tensor Core programming, and advanced GEMM optimization techniques in [GEMM Optimization Deep Dive](GPU/gemm-optimization-deep-dive.md).
+
+**Quantization Kernels** enable efficient low-precision computation through specialized implementations for INT8, INT4, and FP8 formats. These kernels perform on-the-fly dequantization and leverage hardware acceleration like DP4A instructions for INT8 operations.
+
+> 📚 **Deep Dive**: Understand GPTQ, AWQ, mixed-precision computation, and calibration strategies in [Quantization Kernels Deep Dive](GPU/quantization-kernels-deep-dive.md).
 
 **Explained Simply**: Like a chef who preps ingredients while cooking (FlashAttention), uses specialized tools for different tasks (different kernels), and has recipes memorized (optimized operations) - each optimization makes the overall process much faster.
 
@@ -500,13 +512,19 @@ graph LR
 - [FlashAttention Paper (arXiv:2205.14135)](https://arxiv.org/abs/2205.14135)
 - [FlashAttention GitHub](https://github.com/Dao-AILab/flash-attention)
 
+📚 **Kernel Optimization Deep Dives**:
+- [FlashAttention Kernel Deep Dive](GPU/flashattention-kernel-deep-dive.md) - Tiling strategies, online softmax, and implementations
+- [GEMM Optimization Deep Dive](GPU/gemm-optimization-deep-dive.md) - Matrix multiplication at scale
+- [Quantization Kernels Deep Dive](GPU/quantization-kernels-deep-dive.md) - INT8/INT4/FP8 implementations
+- [PagedAttention Kernel Deep Dive](GPU/paged-attention-kernel-deep-dive.md) - Virtual memory for GPUs
+
 ### Q&A: Performance Optimizations
 
 **Q: How does FlashAttention achieve 2-3x speedup over standard attention?**
 A: FlashAttention optimizes memory access patterns, which is the real bottleneck in attention computation:
 1. **Tiling Strategy**: Computes attention in small tiles that fit in SRAM (10x faster than HBM)
 2. **Online Softmax**: Computes softmax incrementally without materializing the full attention matrix
-3. **Reduced Memory Movement**: Moves O(N) data instead of O(N²) between HBM and SRAM
+3. **Reduced Memory Movement**: Moves $O(N)$ data instead of $O(N^2)$ between HBM and SRAM
 4. **Kernel Fusion**: Combines multiple operations into single kernel launches
 On an A100 GPU, HBM bandwidth is 1.5 TB/s while SRAM bandwidth is 19 TB/s - keeping computation in SRAM is crucial.
 
@@ -530,10 +548,10 @@ The choice depends on your accuracy requirements, hardware, and whether you're q
 
 **Q: How does speculative decoding maintain exact output distribution?**
 A: The algorithm uses rejection sampling to ensure correctness:
-1. Draft model generates k tokens with probabilities p_draft(x)
-2. Target model evaluates all k tokens in parallel, getting p_target(x)
-3. For each token, accept with probability min(1, p_target(x)/p_draft(x))
-4. If rejected, sample from adjusted distribution: max(0, p_target - p_draft)
+1. Draft model generates k tokens with probabilities $p_{\text{draft}}(x)$
+2. Target model evaluates all k tokens in parallel, getting $p_{\text{target}}(x)$
+3. For each token, accept with probability $\min\left(1, \frac{p_{\text{target}}(x)}{p_{\text{draft}}(x)}\right)$
+4. If rejected, sample from adjusted distribution: $\max(0, p_{\text{target}} - p_{\text{draft}})$
 5. Continue from the last accepted token
 This guarantees the output is distributed exactly as if the target model generated it alone, just faster when draft and target agree.
 
@@ -582,7 +600,7 @@ graph LR
 
 **What This Diagram Shows**: This diagram illustrates the speculative decoding pipeline where a smaller draft model generates multiple token candidates in parallel, which are then verified by the target model in a single forward pass. The draft model (shown in blue) rapidly generates a sequence of 4 speculative tokens with minimal computational cost. These candidates are then batched and processed by the verification model (green) in one forward pass, rather than four sequential passes required in standard autoregressive generation. The Accept/Reject phase implements a modified rejection sampling algorithm that ensures the output distribution matches exactly what the target model would have produced independently. Accepted tokens are added to the output, while rejection triggers a restart from the last accepted position. This approach typically accepts 3-5 tokens per verification step, achieving 2-3x latency reduction while maintaining identical output quality. The key insight is that the cost of verifying multiple tokens in parallel is similar to generating a single token, while the draft model's generation is 10-50x faster than the target model.
 
-**Technical Implementation**: Speculative decoding maintains the exact output distribution of the target model through a carefully designed acceptance criterion. For each draft token, the algorithm computes the ratio p(x|context)_target / p(x|context)_draft. If this ratio exceeds a uniformly sampled threshold, the token is accepted. Otherwise, the target model's distribution is used to sample a new token. This ensures that the final output is distributed identically to standard autoregressive generation while achieving significant speedup when the draft model's predictions align with the target model.
+**Technical Implementation**: Speculative decoding maintains the exact output distribution of the target model through a carefully designed acceptance criterion. For each draft token, the algorithm computes the ratio $\frac{p(x|\text{context})_{\text{target}}}{p(x|\text{context})_{\text{draft}}}$. If this ratio exceeds a uniformly sampled threshold, the token is accepted. Otherwise, the target model's distribution is used to sample a new token. This ensures that the final output is distributed identically to standard autoregressive generation while achieving significant speedup when the draft model's predictions align with the target model.
 
 **Explained Simply**: Like having a fast assistant draft a letter, then the boss reviews and approves/edits it all at once - much faster than the boss writing every word themselves.
 
@@ -654,7 +672,7 @@ A: The relationship follows a predictable pattern:
 - **KV Cache**: ~0.5GB per billion parameters per 1K sequence length per concurrent request
 - **Activation Memory**: ~5-10% of model weight size
 - **Framework Overhead**: ~2-3GB constant
-For production serving with 10 concurrent requests at 2K context: 7B model needs 24GB, 13B needs 40GB, 70B needs 160GB (2×80GB).
+For production serving with 10 concurrent requests at 2K context: 7B model needs 24GB, 13B needs 40GB, 70B needs 160GB ($2 \times 80$GB).
 
 **Q: What's the performance difference between different GPU generations?**
 A: Each generation brings specific improvements:
@@ -927,7 +945,7 @@ For a 10GB KV cache, prefix caching metadata uses ~100MB - negligible compared t
 
 **Technical Foundation**: LoRA (Low-Rank Adaptation) represents a parameter-efficient fine-tuning paradigm that enables serving multiple specialized model variants without duplicating the base model weights. The technique decomposes weight updates into low-rank matrices, typically reducing trainable parameters by 10,000x while maintaining task performance. vLLM's implementation supports hot-swapping of LoRA adapters, enabling a single deployment to serve diverse specialized tasks.
 
-The mathematical foundation involves representing weight updates as ΔW = BA where B ∈ R^(d×r) and A ∈ R^(r×k) with rank r << min(d,k). During inference, the adapted weights are computed as W' = W + αBA where α is a scaling factor. This decomposition reduces memory overhead from O(dk) to O(r(d+k)), enabling dozens of adapters to coexist in memory.
+The mathematical foundation involves representing weight updates as $\Delta W = BA$ where $B \in \mathbb{R}^{d \times r}$ and $A \in \mathbb{R}^{r \times k}$ with rank $r \ll \min(d,k)$. During inference, the adapted weights are computed as $W' = W + \alpha BA$ where $\alpha$ is a scaling factor. This decomposition reduces memory overhead from $O(dk)$ to $O(r(d+k))$, enabling dozens of adapters to coexist in memory.
 
 ```python
 # Serve base model with multiple LoRA adapters
@@ -941,7 +959,7 @@ llm.generate(
 )
 ```
 
-**Technical Implementation**: vLLM implements LoRA through dynamic weight composition during the forward pass. The system maintains separate storage for base weights and adapter weights, computing W' = W + αBA on-the-fly during matrix multiplication. This approach avoids weight duplication and enables rapid adapter switching. The implementation supports various LoRA variants including QLoRA (quantized base model with LoRA adapters) and multi-LoRA serving where different requests in the same batch use different adapters.
+**Technical Implementation**: vLLM implements LoRA through dynamic weight composition during the forward pass. The system maintains separate storage for base weights and adapter weights, computing $W' = W + \alpha BA$ on-the-fly during matrix multiplication. This approach avoids weight duplication and enables rapid adapter switching. The implementation supports various LoRA variants including QLoRA (quantized base model with LoRA adapters) and multi-LoRA serving where different requests in the same batch use different adapters.
 
 **Explained Simply**: Like having different "personalities" or "skills" that can be attached to the same base AI model - one for SQL, one for Python, one for creative writing - without needing separate models for each.
 
@@ -962,7 +980,7 @@ llm.generate(
 **Q: How does vLLM handle multiple LoRA adapters in the same batch?**
 A: vLLM implements efficient multi-LoRA serving:
 1. **Batch Grouping**: Requests using the same adapter are grouped in the batch
-2. **Dynamic Weight Composition**: W' = W + α₁BA₁ for group 1, W + α₂BA₂ for group 2, computed in parallel
+2. **Dynamic Weight Composition**: $W' = W + \alpha_1 BA_1$ for group 1, $W + \alpha_2 BA_2$ for group 2, computed in parallel
 3. **Kernel Optimization**: Custom CUDA kernels handle multiple adapter matrices in single operation
 4. **Memory Layout**: Adapters stored in separate memory regions for cache-friendly access
 5. **Overhead**: Only ~10-15% slower than single adapter, supporting 10+ adapters concurrently
@@ -1084,19 +1102,19 @@ graph TB
     end
 ```
 
-**What This Shows**: This mapping illustrates the minimum GPU memory requirements for serving different model sizes efficiently. The calculations assume FP16 precision (2 bytes per parameter) plus overhead for KV cache, activation memory, and framework overhead. For a 7B parameter model: model weights require 14GB (7B × 2 bytes), KV cache for 10 concurrent requests with 2K context requires ~8GB, and system overhead needs ~2GB, totaling 24GB. The requirements scale superlinearly with model size due to increased activation memory and attention matrix sizes. For models exceeding single GPU capacity, tensor parallelism distributes the model across multiple GPUs, requiring high-bandwidth interconnects (NVLink or InfiniBand) for efficient communication. Production deployments should provision 20-30% additional headroom for traffic spikes and memory fragmentation.
+**What This Shows**: This mapping illustrates the minimum GPU memory requirements for serving different model sizes efficiently. The calculations assume FP16 precision (2 bytes per parameter) plus overhead for KV cache, activation memory, and framework overhead. For a 7B parameter model: model weights require 14GB ($7B \times 2$ bytes), KV cache for 10 concurrent requests with 2K context requires ~8GB, and system overhead needs ~2GB, totaling 24GB. The requirements scale superlinearly with model size due to increased activation memory and attention matrix sizes. For models exceeding single GPU capacity, tensor parallelism distributes the model across multiple GPUs, requiring high-bandwidth interconnects (NVLink or InfiniBand) for efficient communication. Production deployments should provision 20-30% additional headroom for traffic spikes and memory fragmentation.
 
 ### Memory Calculation Formula
 
-```
-Total Memory = Model Weights + KV Cache + Activation Memory + Overhead
+$$
+\text{Total Memory} = \text{Model Weights} + \text{KV Cache} + \text{Activation Memory} + \text{Overhead}
+$$
 
 Where:
-- Model Weights = num_parameters × bytes_per_parameter
-- KV Cache = num_layers × num_heads × head_dim × max_seq_len × batch_size × 2 × bytes_per_element
-- Activation Memory = batch_size × seq_len × hidden_dim × 4
-- Overhead = ~10% of total
-```
+- Model Weights = $\text{num\_parameters} \times \text{bytes\_per\_parameter}$
+- KV Cache = $\text{num\_layers} \times \text{num\_heads} \times \text{head\_dim} \times \text{max\_seq\_len} \times \text{batch\_size} \times 2 \times \text{bytes\_per\_element}$
+- Activation Memory = $\text{batch\_size} \times \text{seq\_len} \times \text{hidden\_dim} \times 4$
+- Overhead = $\sim 10\%$ of total
 
 **Explained Simply**: Rule of thumb: You need about 2-2.5x the model size in GPU memory for efficient serving.
 
@@ -1106,7 +1124,7 @@ Where:
 |-----------|------------------|---------------------|-------------------|
 | gpu_memory_utilization | 0.90-0.95 | Reserve 5-10% for memory fragmentation and kernels | Prevents OOM while maximizing capacity |
 | max_model_len | 2048-4096 | Balance context and memory; longer sequences quadratically increase memory | Affects quality vs. cost trade-off |
-| tensor_parallel_size | √(num_gpus) | Minimize communication overhead while distributing memory | Optimal parallelism for most models |
+| tensor_parallel_size | $\sqrt{\text{num\_gpus}}$ | Minimize communication overhead while distributing memory | Optimal parallelism for most models |
 | dtype | float16/bfloat16 | 16-bit precision sufficient for inference, 2x memory savings | Negligible quality impact |
 | enforce_eager | False | Enable CUDA graphs for 10-15% latency reduction | Better performance, slight memory overhead |
 | block_size | 16 | Balance between internal fragmentation and block table overhead | Optimal for most workloads |
@@ -1178,10 +1196,10 @@ scrape_configs:
 
 **Q: How do I size GPU memory for production workloads?**
 A: Use this systematic approach:
-1. **Base Model Memory**: `model_params × 2 bytes` (FP16)
-2. **KV Cache per Request**: `num_layers × num_heads × head_dim × max_seq_len × 2 × 2 bytes`
+1. **Base Model Memory**: $\text{model\_params} \times 2$ bytes (FP16)
+2. **KV Cache per Request**: $\text{num\_layers} \times \text{num\_heads} \times \text{head\_dim} \times \text{max\_seq\_len} \times 2 \times 2$ bytes
 3. **Peak Concurrent Requests**: Estimate from traffic patterns
-4. **Total KV Cache**: `kv_per_request × peak_concurrent_requests`
+4. **Total KV Cache**: $\text{kv\_per\_request} \times \text{peak\_concurrent\_requests}$
 5. **Safety Margin**: Add 20-30% for fragmentation and peaks
 Example: 7B model, 32 layers, 32 heads, 128 dim, 2K context, 10 concurrent = 14GB model + 10GB KV cache + 5GB margin = 30GB minimum.
 
